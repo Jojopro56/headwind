@@ -1,0 +1,3259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Headwind</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; height: 100%; background: #07090b; overflow: hidden;
+    touch-action: none;
+  }
+  body {
+    font-family: Georgia, "Times New Roman", serif;
+    color: #d9dde2;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  #stage { position: fixed; inset: 0; }
+  #game { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+  #vignette {
+    position: absolute; inset: 0; pointer-events: none;
+    background: radial-gradient(ellipse at center, rgba(0,0,0,0) 55%, rgba(0,0,0,.44) 100%);
+  }
+
+  .overlay {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; text-align: center;
+    background: radial-gradient(ellipse at center, rgba(14,17,21,.28), rgba(10,12,16,.84));
+    transition: opacity 1.4s ease, letter-spacing 2.2s ease;
+    z-index: 20;
+    padding: 1.5rem;
+  }
+  .overlay.hidden { opacity: 0; pointer-events: none; }
+  .overlay h1 {
+    margin: 0 0 0.8rem; font-weight: 400; font-size: clamp(2.4rem, 8vw, 5.8rem);
+    letter-spacing: .48em; padding-left: .48em; color: #e6e9ec;
+    text-shadow: 0 0 34px rgba(255,200,120,.25);
+  }
+  .overlay.hidden h1 { letter-spacing: .85em; }
+  .subtitle {
+    margin: 0 0 1.8rem; font-style: italic; letter-spacing: .16em; color: #b9c4d0;
+    font-size: clamp(0.88rem, 2.1vw, 1.08rem);
+  }
+  .menu-buttons {
+    display: flex; flex-direction: column; gap: 12px; width: 100%; max-width: 280px;
+    margin-bottom: 1.4rem; z-index: 5;
+  }
+  .menu-btn {
+    background: rgba(16, 21, 29, 0.72);
+    border: 1px solid rgba(215, 224, 235, 0.32);
+    color: #e6ecf2; padding: 11px 20px; border-radius: 6px;
+    font-family: Georgia, serif; font-size: 0.92rem; letter-spacing: 0.14em;
+    cursor: pointer; transition: all 0.22s ease; backdrop-filter: blur(6px);
+  }
+  .menu-btn:hover, .menu-btn:active {
+    background: rgba(255, 210, 125, 0.2);
+    border-color: rgba(255, 218, 145, 0.85);
+    color: #fff3d6; transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+  }
+  .menu-btn.primary {
+    border-color: rgba(255, 212, 130, 0.65);
+    color: #ffe6b3;
+    background: rgba(40, 30, 18, 0.72);
+  }
+  .menu-panel {
+    background: rgba(12, 16, 22, 0.88);
+    border: 1px solid rgba(200, 214, 228, 0.25);
+    border-radius: 8px; padding: 16px 20px; max-width: 440px; width: 100%;
+    margin-bottom: 1.2rem; backdrop-filter: blur(8px);
+  }
+  .menu-panel.hidden { display: none; }
+  .chapter-grid {
+    display: grid; grid-template-columns: 1fr; gap: 8px; margin-top: 10px;
+  }
+  .chapter-btn {
+    text-align: left; padding: 8px 12px; border-radius: 5px;
+    background: rgba(25, 32, 42, 0.7); border: 1px solid rgba(190, 205, 220, 0.22);
+    color: #d5dde6; font-size: 0.8rem; letter-spacing: 0.06em; cursor: pointer;
+    transition: all 0.18s ease;
+  }
+  .chapter-btn:hover {
+    border-color: rgba(255, 212, 130, 0.75); color: #ffe8b8;
+    background: rgba(255, 210, 125, 0.15);
+  }
+  .keys {
+    margin: 0.8rem 1rem 0; font-size: clamp(.72rem, 1.8vw, .82rem);
+    letter-spacing: .07em; color: #848f9c; max-width: 46rem; line-height: 1.7;
+  }
+  @keyframes breathe { 0%,100% { opacity: .35; } 50% { opacity: .98; } }
+
+  #controls {
+    position: absolute; right: 14px; top: 14px; display: flex; gap: 8px;
+    opacity: .65; transition: opacity 0.6s ease; z-index: 25;
+  }
+  #controls:hover { opacity: 1; }
+  #controls.hide { opacity: 0.15; }
+  #controls button {
+    background: rgba(12, 15, 20, 0.68);
+    border: 1px solid rgba(190,200,210,.32);
+    color: #d3dae2; font: inherit; font-size: .72rem;
+    letter-spacing: .1em; text-transform: lowercase;
+    padding: 6px 12px; border-radius: 4px; cursor: pointer;
+    backdrop-filter: blur(4px);
+  }
+  #controls button:hover {
+    border-color: rgba(255,214,150,.7); color: #ffe2b0;
+  }
+
+  #touchControls {
+    position: absolute; left: 0; right: 0; bottom: 0;
+    padding: 12px 18px 20px;
+    display: flex; justify-content: space-between; align-items: flex-end;
+    pointer-events: none; z-index: 15;
+    transition: opacity 0.4s ease;
+  }
+  #touchControls.hidden { opacity: 0; pointer-events: none !important; }
+  .touch-cluster {
+    display: flex; gap: 12px; pointer-events: auto;
+  }
+  .touch-btn {
+    width: 64px; height: 64px; border-radius: 9999px;
+    background: rgba(16, 20, 26, 0.58);
+    border: 1.5px solid rgba(210, 220, 232, 0.35);
+    color: #e5ebf0; font-family: Georgia, serif;
+    font-size: 0.72rem; letter-spacing: 0.06em;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    backdrop-filter: blur(6px);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.38);
+    transition: transform 0.08s ease, background 0.15s ease, border-color 0.15s ease;
+    cursor: pointer;
+    user-select: none;
+  }
+  .touch-btn svg { width: 22px; height: 22px; stroke: currentColor; stroke-width: 2; fill: none; }
+  .touch-btn span { font-size: 0.62rem; opacity: 0.85; margin-top: 2px; }
+  .touch-btn.attack-btn {
+    border-color: rgba(255, 200, 110, 0.55);
+    color: #ffe29e;
+  }
+  .touch-btn.jump-btn {
+    width: 72px; height: 72px;
+    border-color: rgba(160, 215, 255, 0.52);
+    color: #d9f0ff;
+  }
+  .touch-btn.active {
+    transform: scale(0.92);
+    background: rgba(255, 212, 128, 0.28);
+    border-color: rgba(255, 222, 150, 0.92);
+    color: #fff6df;
+  }
+
+  #poemOverlay {
+    position: absolute; inset: 0; z-index: 18;
+    display: flex; flex-direction: column; justify-content: space-between;
+    align-items: center; pointer-events: none; opacity: 0;
+    background: radial-gradient(ellipse at center, rgba(8,10,14,0.35) 0%, rgba(5,7,10,0.82) 100%);
+    transition: opacity 2.4s ease;
+    padding: 2rem 1.5rem;
+  }
+  #poemOverlay.active { opacity: 1; pointer-events: auto; }
+  #poemCenterStage {
+    flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    max-width: 46rem; width: 100%; text-align: center; padding: 0 1rem;
+  }
+  #poemSingleLine {
+    font-size: clamp(1.15rem, 2.8vw, 1.65rem);
+    line-height: 1.75;
+    letter-spacing: 0.06em;
+    color: #fff5e0;
+    text-shadow: 0 2px 24px rgba(0,0,0,0.95), 0 0 30px rgba(255, 205, 115, 0.28);
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity 1.6s ease, transform 1.6s ease;
+    font-style: italic;
+  }
+  #poemSingleLine.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  .poem-Actions {
+    display: flex; gap: 16px; align-items: center; justify-content: center;
+    padding-bottom: 1rem; z-index: 5; opacity: 0; pointer-events: none;
+    transition: opacity 1.8s ease;
+  }
+  .poem-Actions.visible {
+    opacity: 1; pointer-events: auto;
+  }
+  .poem-btn {
+    background: rgba(20, 24, 31, 0.82);
+    border: 1px solid rgba(255, 214, 140, 0.55);
+    color: #ffe7b8; padding: 10px 22px; border-radius: 6px;
+    font-family: Georgia, serif; font-size: 0.86rem; letter-spacing: 0.13em;
+    cursor: pointer; transition: all 0.25s ease;
+    box-shadow: 0 4px 18px rgba(0,0,0,0.5);
+  }
+  .poem-btn:hover {
+    background: rgba(255, 210, 125, 0.25);
+    border-color: #ffd98a; transform: translateY(-1px);
+  }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="game"></canvas>
+  <div id="vignette"></div>
+
+  <!-- Main Menu Overlay -->
+  <div id="title" class="overlay">
+    <h1>HEADWIND</h1>
+    <p class="subtitle">A Story of Stubby Wings, Winter Rain, and the Golden Bough</p>
+
+    <div class="menu-buttons">
+      <button id="beginJourneyBtn" class="menu-btn primary">Begin Journey</button>
+      <button id="chapterSelectBtn" class="menu-btn">Select Act / Chapter</button>
+      <button id="controlsInfoBtn" class="menu-btn">Controls &amp; Audio</button>
+    </div>
+
+    <!-- Chapter Selection Sub-Panel -->
+    <div id="chapterPanel" class="menu-panel hidden">
+      <div class="text-xs uppercase tracking-widest text-amber-200/80 mb-2">Choose a Chapter</div>
+      <div class="chapter-grid">
+        <button class="chapter-btn" data-act="0">Prologue · Narrative Cinematic Intro</button>
+        <button class="chapter-btn" data-act="1">Act I · The Slate Rooftops &amp; Relentless Crows</button>
+        <button class="chapter-btn" data-act="2">Act II · The Golden Mountain &amp; Companion</button>
+        <button class="chapter-btn" data-act="3">Act III · The Cruel Gale &amp; The Last Feather</button>
+        <button class="chapter-btn" data-act="4">Act IV · Winter Endurance &amp; Molting</button>
+        <button class="chapter-btn" data-act="5">Act V · Full Plumage &amp; Reunion</button>
+      </div>
+    </div>
+
+    <!-- Controls & Audio Sub-Panel -->
+    <div id="controlsPanel" class="menu-panel hidden">
+      <div class="text-xs uppercase tracking-widest text-amber-200/80 mb-2">How to Survive &amp; Soar</div>
+      <p class="text-xs text-slate-300 leading-relaxed mb-2">
+        <strong>Move:</strong> A / D or Left / Right Arrows<br>
+        <strong>Jump &amp; Mid-Air Double Flap:</strong> W / Up / Space<br>
+        <strong>Wing-Slash Attack &amp; Companion Bond:</strong> J / F / X / Shift / E<br>
+        <strong>Mute / Restart:</strong> M / R
+      </p>
+      <p class="text-xs text-amber-200/75 italic">
+        On mobile or tablet, use the multi-touch buttons at the bottom corners.
+      </p>
+    </div>
+
+    <p class="keys">
+      Press <strong>SPACE</strong> or tap <strong>Begin Journey</strong> to start with the narrative introduction
+    </p>
+  </div>
+
+  <!-- Redesigned Emotional Finale Cutscene (Sentence-by-Sentence Fade) -->
+  <div id="poemOverlay">
+    <div class="text-xs tracking-widest uppercase text-amber-200/60 mt-2">Act V · Beyond the Gale</div>
+    <div id="poemCenterStage">
+      <p id="poemSingleLine"></p>
+    </div>
+    <div id="poemActions" class="poem-Actions">
+      <button id="poemSkipBtn" class="poem-btn">Continue Soaring Together</button>
+      <button id="poemRestartBtn" class="poem-btn">Begin the Journey Anew</button>
+    </div>
+  </div>
+
+  <!-- Top Right Utility Controls -->
+  <div id="controls">
+    <button id="skipIntroBtn" class="hidden" tabindex="-1" title="Skip Intro (Space/Enter)">skip intro ⏭</button>
+    <button id="touchToggleBtn" tabindex="-1" title="Toggle Touch Controls">touch ui</button>
+    <button id="muteBtn" tabindex="-1" title="Mute (M)">sound on</button>
+    <button id="restartBtn" tabindex="-1" title="Restart (R)">menu / restart</button>
+  </div>
+
+  <!-- Mobile / Tablet On-Screen Touch Controls -->
+  <div id="touchControls">
+    <div class="touch-cluster">
+      <button id="btnLeft" class="touch-btn" aria-label="Move Left">
+        <svg viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+        <span>LEFT</span>
+      </button>
+      <button id="btnRight" class="touch-btn" aria-label="Move Right">
+        <svg viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+        <span>RIGHT</span>
+      </button>
+    </div>
+    <div class="touch-cluster">
+      <button id="btnAttack" class="touch-btn attack-btn" aria-label="Wing Slash or Bond">
+        <svg viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+        <span id="btnAttackLabel">SLASH</span>
+      </button>
+      <button id="btnJump" class="touch-btn jump-btn" aria-label="Jump or Flap">
+        <svg viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7"/></svg>
+        <span>FLAP</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+/* ============================================================================
+ * 1. UTIL MODULE (Math, Color Mixing, Seeded RNG)
+ * ========================================================================== */
+const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+const lerp = (a, b, t) => a + (b - a) * t;
+const smooth = (t) => { t = clamp(t, 0, 1); return t * t * (3 - 2 * t); };
+
+const h2 = (n) => Math.round(clamp(n, 0, 255)).toString(16).padStart(2, '0');
+function hex(c) {
+  c = c.replace('#', '');
+  return [parseInt(c.slice(0, 2), 16), parseInt(c.slice(2, 4), 16), parseInt(c.slice(4, 6), 16)];
+}
+function mix(a, b, t) {
+  const A = hex(a), B = hex(b);
+  return '#' + h2(A[0] + (B[0] - A[0]) * t) + h2(A[1] + (B[1] - A[1]) * t) + h2(A[2] + (B[2] - A[2]) * t);
+}
+function rgba(c, a) {
+  const [r, g, b] = hex(c);
+  return `rgba(${r},${g},${b},${a})`;
+}
+function makeRng(seed) {
+  let s = seed >>> 0;
+  return () => (s = (s * 1664525 + 1013904223) >>> 0) / 4294967296;
+}
+
+/* ============================================================================
+ * 2. AUDIO MODULE (Procedural Web Audio Soundscape + Calm Rubato Finale)
+ * ========================================================================== */
+const midi = (n) => 440 * Math.pow(2, (n - 69) / 12);
+const CHORDS = [
+  [48, 55, 59, 64, 67], // Cmaj9
+  [45, 52, 57, 60, 64], // Am7
+  [41, 48, 53, 57, 64], // Fmaj9
+  [43, 50, 55, 59, 62], // G6/9
+];
+const ARP = [0, 2, 3, 4, 3, 2, 1, 2];
+const MINOR_PENT = [57, 60, 62, 64, 67, 69];
+const NEAR_NOTES = [72, 76, 79, 81, 84, 79, 76, 74];
+
+// Emotional, calm rubato progression for the Finale (Fmaj9 -> Cmaj9 -> Am9 -> G6)
+const FINALE_CALM_PHRASES = [
+  { bass: 41, notes: [65, 69, 72, 76, 79, 76, 72, 69] }, // Fmaj9
+  { bass: 48, notes: [64, 67, 71, 74, 79, 74, 71, 67] }, // Cmaj9
+  { bass: 45, notes: [60, 64, 69, 71, 76, 71, 69, 64] }, // Am9
+  { bass: 43, notes: [59, 62, 67, 69, 74, 69, 67, 62] }, // G6
+];
+
+class AudioEngine {
+  constructor() {
+    this.ctx = null;
+    this.muted = false;
+    this.mode = 'none';
+    this.cache = new Map();
+    this.musicT = 1;
+    this.beat = 0;
+    this.chirpT = 3;
+    this.finale = false;
+    this.calmPhraseIdx = 0;
+    this.calmStepIdx = 0;
+  }
+
+  init() {
+    if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    const c = (this.ctx = new AC());
+    this.master = c.createGain();
+    this.master.gain.value = this.muted ? 0 : 0.8;
+    this.lp = c.createBiquadFilter();
+    this.lp.type = 'lowpass';
+    this.lp.frequency.value = 2200;
+    this.lp.Q.value = 0.6;
+    this.lp.connect(this.master);
+    this.master.connect(c.destination);
+
+    this.bus = c.createGain();
+    this.bus.connect(this.lp);
+    const send = c.createGain(); send.gain.value = 0.28;
+    const delay = c.createDelay(1); delay.delayTime.value = 0.31;
+    const fb = c.createGain(); fb.gain.value = 0.4;
+    const fl = c.createBiquadFilter(); fl.type = 'lowpass'; fl.frequency.value = 2400;
+    this.bus.connect(send); send.connect(delay); delay.connect(fl); fl.connect(fb); fb.connect(delay);
+    fl.connect(this.lp);
+
+    const len = c.sampleRate * 4;
+    const nb = c.createBuffer(1, len, c.sampleRate);
+    const d = nb.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    const noise = (off) => { const s = c.createBufferSource(); s.buffer = nb; s.loop = true; s.start(0, off); return s; };
+
+    const rn = noise(0.3), rbp = c.createBiquadFilter(); rbp.type = 'bandpass'; rbp.frequency.value = 2600; rbp.Q.value = 0.4;
+    const rhp = c.createBiquadFilter(); rhp.type = 'highpass'; rhp.frequency.value = 700;
+    this.rainG = c.createGain(); this.rainG.gain.value = 0;
+    rn.connect(rhp); rhp.connect(rbp); rbp.connect(this.rainG); this.rainG.connect(this.lp);
+
+    const wn = noise(1.7); this.windF = c.createBiquadFilter(); this.windF.type = 'bandpass'; this.windF.frequency.value = 400; this.windF.Q.value = 1.1;
+    this.windG = c.createGain(); this.windG.gain.value = 0;
+    const lfo = c.createOscillator(); lfo.frequency.value = 0.13;
+    const lfoG = c.createGain(); lfoG.gain.value = 180;
+    lfo.connect(lfoG); lfoG.connect(this.windF.frequency); lfo.start();
+    wn.connect(this.windF); this.windF.connect(this.windG); this.windG.connect(this.lp);
+
+    const un = noise(2.9), ulp = c.createBiquadFilter(); ulp.type = 'lowpass'; ulp.frequency.value = 110;
+    this.rumbleG = c.createGain(); this.rumbleG.gain.value = 0;
+    un.connect(ulp); ulp.connect(this.rumbleG); this.rumbleG.connect(this.lp);
+
+    this.padG = c.createGain(); this.padG.gain.value = 0;
+    const plp = c.createBiquadFilter(); plp.type = 'lowpass'; plp.frequency.value = 1100;
+    [1, 1.5, 2, 2.5, 3, 4].forEach((m, i) => {
+      const o = c.createOscillator(); o.type = i % 2 ? 'triangle' : 'sine';
+      o.frequency.value = 87.31 * m; // Warm F2 root cello/organ pad
+      o.detune.value = (i - 2.5) * 2.5;
+      const g = c.createGain(); g.gain.value = 0.48 / (i + 1);
+      o.connect(g); g.connect(plp); o.start();
+    });
+    plp.connect(this.padG); this.padG.connect(this.bus);
+  }
+
+  toggleMute() {
+    this.muted = !this.muted;
+    if (this.ctx) this.master.gain.setTargetAtTime(this.muted ? 0 : 0.8, this.ctx.currentTime, 0.05);
+    return this.muted;
+  }
+
+  setMode(m) {
+    if (m !== this.mode) {
+      this.mode = m;
+      this.beat = 0;
+      this.musicT = m === 'finale_calm' ? 2.6 : 0.6;
+    }
+  }
+
+  update(dt, p) {
+    const c = this.ctx; if (!c) return;
+    const t = c.currentTime;
+    const n = (v) => (Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : 0);
+    p = { grade: n(p.grade), rain: n(p.rain), wind: n(p.wind), rumble: n(p.rumble) };
+    this.lp.frequency.setTargetAtTime(1500 + 15000 * Math.pow(p.grade, 1.3), t, 0.4);
+    this.rainG.gain.setTargetAtTime(0.26 * p.rain, t, 0.3);
+    this.windG.gain.setTargetAtTime(0.03 + 0.2 * p.wind + 0.03 * p.grade, t, 0.3);
+    this.windF.Q.setTargetAtTime(1.1 + p.wind, t, 0.3);
+    this.rumbleG.gain.setTargetAtTime(0.55 * p.rumble, t, 0.5);
+
+    this.musicT -= dt;
+    if (this.musicT > 0) return;
+
+    if (this.mode === 'intro') {
+      const introNotes = [57, 64, 69, 72, 71, 67, 64, 60];
+      const note = introNotes[this.beat % introNotes.length];
+      this.pluck(midi(note), 0.42);
+      if (this.beat % 4 === 0) this.tone(midi(note - 12), 2.4, 0.04, 'sine');
+      this.beat++;
+      this.musicT = 1.65 + Math.random() * 0.45;
+    } else if (this.mode === 'gray') {
+      this.pluck(midi(MINOR_PENT[(Math.random() * MINOR_PENT.length) | 0] + (Math.random() < 0.3 ? 12 : 0)), 0.5);
+      if (Math.random() < 0.25) this.pluck(midi(45), 0.45);
+      this.musicT = 2.8 + Math.random() * 2.2;
+    } else if (this.mode === 'tragic') {
+      const tragicNotes = [57, 60, 64, 65, 64, 60, 55, 57];
+      const n1 = tragicNotes[this.beat % tragicNotes.length];
+      this.pluck(midi(n1), 0.55);
+      this.tone(midi(n1 - 12), 1.8, 0.065, 'triangle');
+      this.beat++;
+      this.musicT = 1.15;
+    } else if (this.mode === 'warm') {
+      const ch = CHORDS[Math.floor(this.beat / 8) % 4];
+      const idx = this.beat % 8;
+      if (idx === 0) this.pluck(midi(ch[0] - 12), 0.5);
+      if (Math.random() > 0.12) this.pluck(midi(ch[ARP[idx]] + 12), 0.4);
+      this.beat++;
+      this.musicT = 0.45 + 0.1 * Math.random();
+    } else if (this.mode === 'finale_calm') {
+      const phrase = FINALE_CALM_PHRASES[this.calmPhraseIdx % FINALE_CALM_PHRASES.length];
+      const step = this.calmStepIdx % phrase.notes.length;
+      if (step === 0) {
+        this.pluck(midi(phrase.bass), 0.58);
+        this.tone(midi(phrase.bass), 3.6, 0.07, 'triangle');
+        this.tone(midi(phrase.bass + 12), 3.2, 0.045, 'sine');
+      }
+      const melodyMidi = phrase.notes[step];
+      this.pluck(midi(melodyMidi), 0.44 + (step === 4 ? 0.14 : 0));
+      if (step === 4) {
+        this.tone(midi(melodyMidi + 12), 2.2, 0.035, 'sine', 0.18);
+      }
+      this.calmStepIdx++;
+      if (this.calmStepIdx >= phrase.notes.length) {
+        this.calmStepIdx = 0;
+        this.calmPhraseIdx++;
+        this.musicT = 1.85;
+      } else {
+        this.musicT = 0.92 + Math.sin(step * 0.8) * 0.18;
+      }
+    }
+
+    if (this.finale) {
+      this.chirpT -= dt;
+      if (this.chirpT <= 0) { this.chirp(); this.chirpT = 3.2 + Math.random() * 4.0; }
+    }
+  }
+
+  ks(freq) {
+    const key = Math.round(freq * 2);
+    let b = this.cache.get(key); if (b) return b;
+    const c = this.ctx, sr = c.sampleRate, len = (sr * 2.4) | 0;
+    b = c.createBuffer(1, len, sr);
+    const d = b.getChannelData(0);
+    const N = Math.max(2, Math.round(sr / freq));
+    const line = new Float32Array(N);
+    let prev = 0;
+    for (let i = 0; i < N; i++) { prev = prev * 0.5 + (Math.random() * 2 - 1) * 0.5; line[i] = prev; }
+    let idx = 0, peak = 0;
+    for (let i = 0; i < len; i++) {
+      const nx = (idx + 1) % N;
+      d[i] = line[idx];
+      line[idx] = (line[idx] + line[nx]) * 0.5 * 0.9965;
+      idx = nx;
+      const a = Math.abs(d[i]); if (a > peak) peak = a;
+    }
+    for (let i = 0; i < len; i++) d[i] /= peak || 1;
+    this.cache.set(key, b);
+    return b;
+  }
+
+  pluck(freq, vel = 0.5, delay = 0) {
+    const c = this.ctx; if (!c) return;
+    const t = c.currentTime + delay;
+    const s = c.createBufferSource(); s.buffer = this.ks(freq);
+    const g = c.createGain(); g.gain.value = vel * 0.45;
+    const f = c.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 3200;
+    s.connect(f); f.connect(g); g.connect(this.bus);
+    s.start(t); s.stop(t + 2.4);
+  }
+
+  tone(freq, dur, vol, type = 'sine', delay = 0, glideTo = null) {
+    const c = this.ctx; if (!c) return;
+    const t = c.currentTime + delay;
+    const o = c.createOscillator(); o.type = type; o.frequency.setValueAtTime(freq, t);
+    if (glideTo) o.frequency.exponentialRampToValueAtTime(glideTo, t + dur);
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(this.bus);
+    o.start(t); o.stop(t + dur + 0.05);
+  }
+
+  tick(strong = false) { this.tone(strong ? 1400 : 1000, 0.05, strong ? 0.08 : 0.04, 'sine'); }
+  tock() { this.tone(150, 0.14, 0.12, 'triangle'); }
+  bell() {
+    [[1, 1], [2.76, 0.5], [5.4, 0.3], [8.93, 0.15]].forEach(([m, v]) => this.tone(523 * m, 2.6 / m + 0.6, 0.16 * v, 'sine'));
+  }
+  gustCue() { [60, 67, 72, 76].forEach((n, i) => this.pluck(midi(n), 0.5, i * 0.16)); }
+  twigChime() { this.pluck(midi(84), 0.5); this.pluck(midi(91), 0.4, 0.12); }
+  featherChime() { [67, 72, 76, 79].forEach((n, i) => this.pluck(midi(n), 0.55, i * 0.09)); }
+  wonderChime() { [64, 67, 71, 76, 83].forEach((n, i) => this.pluck(midi(n), 0.58, i * 0.1)); }
+  loverRevealCue() {
+    [60, 64, 67, 72, 76, 79, 84].forEach((n, i) => this.pluck(midi(n), 0.6, i * 0.12));
+    this.chirp();
+  }
+  bondCue(kind = 0) {
+    if (kind === 0) {
+      [[72, 76], [74, 77], [76, 79], [79, 84]].forEach(([a, b], i) => {
+        this.pluck(midi(a), 0.48, i * 0.14);
+        this.pluck(midi(b), 0.42, i * 0.14 + 0.05);
+      });
+      this.chirp();
+    } else if (kind === 1) {
+      this.tone(1760, 0.16, 0.05, 'sine', 0, 2349);
+      this.tone(2349, 0.22, 0.05, 'sine', 0.18, 2093);
+      this.tone(1975, 0.18, 0.05, 'sine', 0.45, 2637);
+      this.tone(2637, 0.28, 0.05, 'sine', 0.65, 3135);
+      [60, 67, 72, 76, 79, 84].forEach((n, i) => this.pluck(midi(n), 0.5, i * 0.12));
+    } else if (kind === 2) {
+      [53, 57, 60, 65, 69, 72, 77, 81].forEach((n, i) => this.pluck(midi(n), 0.55, i * 0.09));
+    } else {
+      [67, 71, 74, 79, 74, 79, 83, 86].forEach((n, i) => this.pluck(midi(n), 0.5, i * 0.08));
+      this.chirp();
+    }
+  }
+  sacrificeCry() {
+    this.tone(1567.98, 0.45, 0.09, 'sine', 0, 1174.66);
+    this.tone(1174.66, 0.65, 0.08, 'sine', 0.35, 880);
+    [69, 65, 64, 60, 57, 52, 45].forEach((n, i) => this.pluck(midi(n), 0.65, i * 0.16));
+    this.tone(midi(45), 3.2, 0.12, 'triangle', 0.2);
+  }
+  noteNear(i) { this.pluck(midi(NEAR_NOTES[i % NEAR_NOTES.length]), 0.45); }
+  jump(soft) { this.tone(soft ? 420 : 260, 0.12, 0.05, 'sine', 0, soft ? 760 : 360); }
+  doubleFlap() {
+    this.tone(330, 0.1, 0.06, 'triangle', 0, 580);
+    this.tone(580, 0.12, 0.04, 'sine', 0.05, 820);
+  }
+  slash() {
+    this.tone(680, 0.11, 0.08, 'sawtooth', 0, 210);
+    this.pluck(midi(76), 0.35);
+  }
+  crowCaw() {
+    this.tone(520, 0.18, 0.055, 'sawtooth', 0, 340);
+    this.tone(490, 0.22, 0.045, 'sawtooth', 0.12, 290);
+  }
+  crowHit() {
+    this.tone(240, 0.14, 0.09, 'triangle', 0, 110);
+    this.pluck(midi(72), 0.45);
+  }
+  hurt() {
+    this.tone(180, 0.24, 0.12, 'sawtooth', 0, 75);
+    this.tone(130, 0.28, 0.1, 'triangle', 0.03, 65);
+  }
+  healPickup() {
+    this.pluck(midi(79), 0.45);
+    this.pluck(midi(84), 0.45, 0.08);
+  }
+  chirp() {
+    const n = 2 + ((Math.random() * 3) | 0), base = 2400 + Math.random() * 1400;
+    for (let i = 0; i < n; i++) this.tone(base, 0.09, 0.03, 'sine', i * 0.12, base * (1.25 + Math.random() * 0.3));
+  }
+  startFinale() {
+    this.finale = true;
+    this.calmPhraseIdx = 0;
+    this.calmStepIdx = 0;
+    this.setMode('finale_calm');
+    this.musicT = 2.6;
+    if (this.ctx) {
+      const now = this.ctx.currentTime;
+      this.padG.gain.cancelScheduledValues(now);
+      this.padG.gain.setValueAtTime(0.001, now);
+      this.padG.gain.setTargetAtTime(0.18, now + 2.2, 3.0);
+    }
+  }
+  stopFinale() {
+    this.finale = false;
+    if (this.ctx) this.padG.gain.setTargetAtTime(0, this.ctx.currentTime, 0.4);
+  }
+}
+
+/* ============================================================================
+ * 3. PLAYER MODULE (Bird Rendering, Double Jump in Mundane, Wing-Slash Combat)
+ * ========================================================================== */
+const PLAYER_MAX_MOVE = 240;
+const WORLD_MIN_X = 30, WORLD_MAX_X = 6050;
+
+const BIRD_PAL = { body: '#dcc7a4', belly: '#f3e8d4', wing: '#8b7660', wingFar: '#6c5a49', beak: '#e3a64c', gold: '#ffd470' };
+
+function drawBird(ctx, b) {
+  const f = b.facing < 0 ? -1 : 1, gy = b.gray || 0, pal = b.pal || BIRD_PAL, sc = b.scale || 1;
+  const C = (c) => (gy > 0.01 ? mix(c, '#7c8794', gy * 0.3) : c);
+  ctx.save();
+  ctx.translate(b.x, b.y + (b.bob || 0));
+  ctx.rotate(b.lean || 0);
+  ctx.scale(f * sc, sc);
+
+  if (b.hurtFlash > 0) {
+    ctx.globalAlpha = 0.55 + 0.45 * Math.sin(b.hurtFlash * 40);
+  }
+
+  if (b.molt > 0) {
+    const g = ctx.createRadialGradient(-6, -14, 2, -6, -14, 34);
+    g.addColorStop(0, rgba('#ffd470', 0.7 * b.molt)); g.addColorStop(1, rgba('#ffd470', 0));
+    ctx.fillStyle = g; ctx.fillRect(-45, -50, 90, 70);
+  }
+
+  drawWing(ctx, b, pal, C, true);
+
+  // tail
+  ctx.fillStyle = C(pal.wingFar);
+  ctx.beginPath(); ctx.moveTo(-9, -12); ctx.lineTo(-21, -8); ctx.lineTo(-20, -14); ctx.lineTo(-9, -16); ctx.closePath(); ctx.fill();
+  // legs
+  ctx.strokeStyle = '#3b3128'; ctx.lineWidth = 1.6; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(-2, -5); ctx.lineTo(-2, 0); ctx.moveTo(3, -5); ctx.lineTo(3, 0);
+  ctx.moveTo(-2, 0); ctx.lineTo(1, 0); ctx.moveTo(3, 0); ctx.lineTo(6, 0); ctx.stroke();
+  // body
+  ctx.fillStyle = b.hurtFlash > 0.2 ? '#ff8b7a' : C(pal.body);
+  ctx.beginPath(); ctx.ellipse(0, -12, 12, 9.5, -0.12, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = C(pal.belly);
+  ctx.beginPath(); ctx.ellipse(2.5, -9.5, 8, 5.4, -0.1, 0, Math.PI * 2); ctx.fill();
+
+  drawWing(ctx, b, pal, C, false);
+
+  // head
+  ctx.fillStyle = b.hurtFlash > 0.2 ? '#ff988a' : C(pal.body);
+  ctx.beginPath(); ctx.arc(9, -20, 6.8, 0, Math.PI * 2); ctx.fill();
+  // Golden Aura Crest if gifted by companion nest-bonding
+  if (b.hasCrest) {
+    ctx.fillStyle = '#ffd978';
+    ctx.beginPath();
+    ctx.moveTo(6, -26); ctx.lineTo(1, -31); ctx.lineTo(4, -25);
+    ctx.moveTo(8, -26.5); ctx.lineTo(4, -33); ctx.lineTo(7, -25.5);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.fillStyle = C(pal.beak);
+  ctx.beginPath(); ctx.moveTo(14.5, -21.5); ctx.lineTo(21, -19.5); ctx.lineTo(14.5, -17.8); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#1b1a19'; ctx.beginPath(); ctx.arc(11.6, -21.4, 1.4, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(12.0, -21.8, 0.45, 0, Math.PI * 2); ctx.fill();
+
+  // Wing-Slash Arc Effect
+  if (b.attackT > 0) {
+    const p = 1 - b.attackT / 0.24;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.strokeStyle = rgba('#ffe294', (1 - p) * 0.95);
+    ctx.lineWidth = 5 * (1 - p * 0.5);
+    ctx.beginPath();
+    ctx.arc(12, -14, 24 + p * 18, -1.1, 1.05);
+    ctx.stroke();
+
+    ctx.strokeStyle = rgba('#ffffff', (1 - p) * 0.75);
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(15, -14, 28 + p * 16, -0.8, 0.8);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  ctx.restore();
+}
+
+function drawWing(ctx, b, pal, C, far) {
+  const st = b.stage | 0;
+  const flap = Math.sin((b.phase || 0) + (far ? 0.7 : 0)) * (b.amp || 0);
+  ctx.save();
+  ctx.translate(far ? 1.5 : -1, far ? -15 : -14);
+  const col = C(far ? pal.wingFar : pal.wing);
+  if (st === 0) {
+    ctx.rotate(Math.PI - 0.1 + flap * 0.9);
+    ctx.fillStyle = col;
+    ctx.beginPath(); ctx.ellipse(6, 0, 6.5, 3.6, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = mix(far ? pal.wingFar : pal.wing, '#d6cbb8', 0.45);
+    ctx.beginPath(); ctx.ellipse(9.5, 1.6, 3.2, 1.7, 0.25, 0, Math.PI * 2); ctx.fill();
+  } else {
+    const spread = clamp(b.spread == null ? 0.2 : b.spread, 0, 1);
+    ctx.fillStyle = col;
+    ctx.save(); ctx.rotate(Math.PI - 0.1 + flap + spread * 0.25);
+    ctx.beginPath(); ctx.ellipse(5, 0, 7, 4.5, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+    for (let i = st - 1; i >= 0; i--) {
+      const a = Math.PI - 0.12 + flap * (0.85 + i * 0.05) + spread * (0.1 + i * 0.17);
+      const len = 12 + i * 3.7, wd = 3.1 + (i === 0 ? 0.8 : 0.3);
+      ctx.save(); ctx.rotate(a);
+      ctx.fillStyle = C(mix(far ? pal.wingFar : pal.wing, '#b9a58a', i * 0.05));
+      ctx.beginPath(); ctx.ellipse(len / 2, 0, len / 2, wd, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = far ? mix(pal.gold, '#8b6a30', 0.4) : pal.gold;
+      ctx.beginPath(); ctx.ellipse(len - 4.2, 0, 4.4, wd * 0.82, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+  }
+  ctx.restore();
+}
+
+class Player {
+  constructor() { this.reset(0, 0); }
+
+  reset(x, y) {
+    Object.assign(this, {
+      x, y, vx: 0, vy: 0, w: 20, h: 20, onGround: false, facing: 1, featherStage: 0,
+      spread: 0.2, lean: 0, extraLean: 0, phase: 0, amp: 0, coyote: 0, buf: 0, flapCd: 0,
+      airFlapsLeft: 1, maxAirFlaps: 1,
+      hp: 100, maxHp: 100, invuln: 0, hurtFlash: 0,
+      attackT: 0, attackCd: 0, attackHitbox: null,
+      molt: 0, flying: false, showOff: false, events: [], wasGround: false,
+      hasCrest: false, bob: 0,
+    });
+  }
+
+  takeDamage(amount, knockDir = -1) {
+    if (this.invuln > 0) return false;
+    this.hp = Math.max(12, this.hp - amount); // Keep survival tense without soft-locking the story
+    this.invuln = 1.05;
+    this.hurtFlash = 0.6;
+    this.vx = knockDir * 210;
+    this.vy = -240;
+    this.onGround = false;
+    this.events.push('hurt');
+    return true;
+  }
+
+  heal(amount) {
+    this.hp = Math.min(this.maxHp, this.hp + amount);
+  }
+
+  update(dt, inp, env, solids) {
+    this.invuln = Math.max(0, this.invuln - dt);
+    this.hurtFlash = Math.max(0, this.hurtFlash - dt);
+    this.attackT = Math.max(0, this.attackT - dt);
+    this.attackCd = Math.max(0, this.attackCd - dt);
+
+    const dir = (inp.right ? 1 : 0) - (inp.left ? 1 : 0);
+    let target = dir * env.max * (env.slow || 1);
+    if (this.hp < 30 && env.isMundane) target *= 0.85; // Exhaustion when wounded in mundane world
+    if (env.gust) target = dir * 70 + 180 * clamp((5290 - this.x) / 200, -1, 1);
+    const rate = env.accel * (this.onGround ? 1 : 0.75) * (dir ? 1 : 1.2);
+    this.vx += clamp(target - this.vx, -rate * dt, rate * dt);
+    if (dir) this.facing = dir;
+    else if (env.gust && Math.abs(this.vx) > 25) this.facing = Math.sign(this.vx);
+
+    if (this.onGround) {
+      this.coyote = 0.11;
+      this.airFlapsLeft = env.airFlaps != null ? env.airFlaps : 1;
+    } else {
+      this.coyote -= dt;
+    }
+
+    this.buf -= dt;
+    this.flapCd -= dt;
+    if (inp.jumpPressed) this.buf = 0.14;
+
+    // Wing-Slash Attack / Gust Pulse
+    if (inp.attackPressed && this.attackCd <= 0) {
+      this.attackT = 0.24;
+      this.attackCd = 0.42;
+      this.vx += this.facing * 95;
+      if (!this.onGround && this.vy > 0) this.vy *= 0.45;
+      this.events.push('slash');
+    }
+
+    if (this.attackT > 0) {
+      this.attackHitbox = {
+        x: this.x + (this.facing > 0 ? -4 : -48),
+        y: this.y - 34,
+        w: 52,
+        h: 40,
+        dir: this.facing,
+      };
+    } else {
+      this.attackHitbox = null;
+    }
+
+    let jumped = false;
+    if (!env.gust && this.buf > 0 && this.coyote > 0) {
+      this.vy = -env.jump;
+      this.onGround = false;
+      this.coyote = 0;
+      this.buf = 0;
+      jumped = true;
+      this.events.push('jump');
+    } else if (!env.gust && inp.jumpPressed && !this.onGround) {
+      if (env.isMundane && this.airFlapsLeft > 0) {
+        this.airFlapsLeft--;
+        this.vy = -env.doubleFlapVy;
+        this.buf = 0;
+        this.events.push('doubleFlap');
+      } else if (env.flap && this.flapCd <= 0) {
+        this.vy = Math.min(this.vy, -env.flap);
+        this.flapCd = 0.30;
+        this.events.push('flap');
+      }
+    }
+
+    this.flying = false;
+    if (env.gust) {
+      const tvy = this.y > 175 ? -150 : clamp((165 - this.y) * 2, -60, 60);
+      this.vy += (tvy - this.vy) * Math.min(1, dt * 3);
+      this.flying = true;
+    } else if (env.soar && !this.onGround && inp.jumpHeld && !jumped) {
+      this.vy += (-165 - this.vy) * Math.min(1, dt * 4.2);
+      this.flying = true;
+    } else {
+      let g = env.g;
+      if (!inp.jumpHeld && this.vy < 0 && !env.soar) g *= 1.75;
+      this.vy += g * dt;
+      if (env.flutter && !this.onGround && inp.jumpHeld && this.vy > env.flutter) {
+        this.vy += (env.flutter - this.vy) * Math.min(1, dt * 10);
+        this.flying = true;
+      }
+      if (env.soar && !this.onGround && this.vy > 210) this.vy += (210 - this.vy) * Math.min(1, dt * 6);
+      if (env.glide && !this.onGround && this.vy > env.glide) this.vy += (env.glide - this.vy) * Math.min(1, dt * 6);
+      this.vy = Math.min(this.vy, 900);
+    }
+
+    // Horizontal movement & solid collisions
+    const wind = env.wind || 0;
+    const dx = (this.vx - wind) * dt;
+    this.x += dx;
+    const hw = this.w / 2;
+    for (const s of solids) {
+      if (s.oneWay) continue;
+      const t = this.y - this.h, b = this.y;
+      if (this.x + hw > s.x && this.x - hw < s.x + s.w && t < s.y + s.h - 0.5 && b > s.y + 0.5) {
+        if (dx > 0) this.x = s.x - hw; else if (dx < 0) this.x = s.x + s.w + hw;
+        this.vx = 0;
+      }
+    }
+    this.x = clamp(this.x, env.minX || WORLD_MIN_X, WORLD_MAX_X);
+
+    // Vertical movement & landing
+    const prevY = this.y;
+    this.y += this.vy * dt;
+    this.wasGround = this.onGround;
+    const impact = this.vy;
+    this.onGround = false;
+    for (const s of solids) {
+      if (this.x + hw <= s.x + 0.5 || this.x - hw >= s.x + s.w - 0.5) continue;
+      if (this.vy >= 0 && prevY <= s.y + 4 && this.y >= s.y) {
+        this.y = s.y; this.vy = 0; this.onGround = true;
+      } else if (!s.oneWay && this.vy < 0 && prevY - this.h >= s.y + s.h - 0.5 && this.y - this.h < s.y + s.h) {
+        this.y = s.y + s.h + this.h; this.vy = 0;
+      }
+    }
+    if (!this.wasGround && this.onGround && impact > 260) this.events.push('land');
+    this.animate(dt, dir, env, inp);
+  }
+
+  animate(dt, dir, env, inp) {
+    const wind = env && env.wind ? 1 : 0;
+    const k = (r) => Math.min(1, dt * r);
+    let leanT = (dir || 0) * 0.1 + this.facing * wind * 0.42 + this.extraLean;
+    if (!this.onGround) leanT += this.facing * clamp(this.vy * 0.0004, -0.15, 0.25);
+    this.lean += (leanT - this.lean) * k(8);
+    let sp = this.onGround ? 0.18 : 0.5 + 0.4 * (this.featherStage / 6);
+    if (this.flying && env && env.soar) sp = 1;
+    if (this.showOff || this.attackT > 0) sp = 1;
+    this.spread += (sp - this.spread) * k(6);
+    const flutterOn = this.flying || this.attackT > 0 || (!this.onGround && inp && inp.jumpHeld && env && env.flutter);
+    const ampT = this.attackT > 0 ? 0.85 : this.flying ? 0.55 : !this.onGround ? 0.35 : this.showOff ? 0.25 : 0;
+    this.amp += (ampT - this.amp) * k(10);
+    this.phase += dt * (flutterOn ? 22 : !this.onGround ? 12 : 4);
+    if (this.molt > 0) this.molt = Math.max(0, this.molt - dt * 0.9);
+  }
+
+  draw(ctx, gray) {
+    drawBird(ctx, {
+      x: this.x, y: this.y, facing: this.facing, lean: this.lean, stage: this.featherStage,
+      spread: this.spread, phase: this.phase, amp: this.amp, gray, molt: this.molt,
+      hurtFlash: this.hurtFlash, attackT: this.attackT, hasCrest: this.hasCrest, bob: this.bob,
+    });
+  }
+}
+
+/* ============================================================================
+ * 4. WORLD MODULE (Mundane Obstacles, Hostile Crows, Companion Bonding & Act 3 Sacrifice)
+ * ========================================================================== */
+const ROOF_END = 4200;
+const GROUND_Y = 440;
+const CHIMNEYS = Array.from({ length: 9 }, (_, i) => 520 + i * 430);
+
+// Expanded Paradise Platforms, Floating Islands & Secret Shrines
+const PLATS = [
+  { id: 'A', x: 4620, y: 410, w: 960 },  // Mossy Base Terrace
+  { id: 'B', x: 4800, y: 335, w: 280 },  // Lower West Bough
+  { id: 'C', x: 5080, y: 275, w: 240 },  // Heartwood Bough
+  { id: 'D', x: 5110, y: 195, w: 340 },  // Upper Canopy Bough
+  { id: 'E', x: 4510, y: 265, w: 210, float: true }, // West Floating Lantern Isle
+  { id: 'F', x: 4720, y: 155, w: 220, float: true }, // High Cloud-Lotus Isle
+  { id: 'G', x: 5480, y: 310, w: 260, float: true }, // East Sun-Arch Isle
+  { id: 'H', x: 5490, y: 120, w: 350 },  // Sanctuary Summit Bough (Lover's Perch)
+  { id: 'I', x: 5130, y: 75,  w: 220, float: true }, // Crown Sky-Altar
+  { id: 'J', x: 5790, y: 235, w: 240, float: true }, // Far Eastern Star-Shrine
+];
+
+const COMPANION = { x: 5690, y: 120 };
+const TRUNK_X = 5060;
+const COMP_PAL = { body: '#c98a5a', belly: '#f2d6b3', wing: '#7a5a45', wingFar: '#5c4536', beak: '#e3a64c', gold: '#ffd470' };
+const RIDGE = [[0, .80], [.12, .72], [.22, .63], [.30, .66], [.40, .52], [.47, .58], [.55, .44], [.63, .56], [.72, .62], [.82, .55], [.92, .66], [1, .72]];
+
+class World {
+  constructor() {
+    const r = makeRng(11);
+    this.time = 0;
+    const mk = (n, wMin, wMax, hMin, hMax) => {
+      const a = []; let total = 0;
+      for (let i = 0; i < n; i++) {
+        const w = wMin + r() * (wMax - wMin), h = hMin + r() * (hMax - hMin);
+        const wins = []; for (let k = 0; k < 6; k++) if (r() < 0.5) wins.push([8 + r() * (w - 20), 14 + r() * 60]);
+        a.push({ w, h, wins }); total += w;
+      }
+      return { a, total };
+    };
+    this.sky1 = mk(16, 60, 120, 120, 210);
+    this.sky2 = mk(14, 80, 150, 90, 170);
+    this.rain = Array.from({ length: 340 }, () => ({ x: r() * 1500, y: r() * 540, vy: 560 + r() * 240, vx: -90 - r() * 40 }));
+    this.streaks = Array.from({ length: 120 }, () => { const y0 = r() * 540; return { x: r() * 1500, y0, y: y0, l: 60 + r() * 170, s: 900 + r() * 700, a: 0.12 + r() * 0.35 }; });
+    this.petals = Array.from({ length: 65 }, () => ({ x: r() * 1500, y: r() * 540, vx: -10 - r() * 20, vy: 6 + r() * 14, r: 1.2 + r() * 2, ph: r() * 6.28 }));
+    this.comp = { facing: -1, lean: 0, near: 0, phase: 0, revealed: false, revealProgress: 0, bondLevel: 0, nestProgress: 0, bondAnim: null, act3Pos: null };
+
+    // Mundane World Rooftop Obstacles & Hazards
+    this.antennas = [];
+    this.steamVents = [];
+    this.acUnits = [];
+    this.powerPoles = [];
+    for (let i = 0; i < 8; i++) {
+      const base = 360 + i * 440;
+      this.acUnits.push({ x: base + 65, y: GROUND_Y - 28, w: 44, h: 28 });
+      this.antennas.push({ x: base + 250, y: GROUND_Y - 72, w: 14, h: 72 });
+      this.steamVents.push({ x: base + 345, y: GROUND_Y, phase: i * 1.1, active: false });
+      this.powerPoles.push({ x: base + 120, y: GROUND_Y - 118, sparkPhase: i * 1.7 });
+    }
+
+    this.reset();
+  }
+
+  reset() {
+    this.dust = []; this.embers = []; this.twigs = []; this.motes = [];
+    this.feathers = []; // Healing golden embers/feathers dropped by defeated crows
+    this.hearts = [];   // Wholesome floating hearts, musical notes & sound rings
+    this.crows = [];
+    this.crowSpawnT = 1.2;
+    this.events = []; this.flash = 0; this.squall = null; this.squallT = 10;
+    this.comp.revealed = false;
+    this.comp.revealProgress = 0;
+    this.comp.bondLevel = 0;
+    this.comp.nestProgress = 0;
+    this.comp.bondAnim = null;
+    this.comp.act3Pos = null;
+    this.keepsakeFeather = null;
+
+    // Discoverable Wonders in the Paradise World
+    this.wonders = [
+      { id: 'lantern_west', x: 4590, y: 265, type: 'lantern', name: 'Lantern of Dawn', found: false, glow: 0 },
+      { id: 'chime_bough',  x: 4920, y: 335, type: 'chime',   name: 'Whispering Wind-Chime', found: false, glow: 0 },
+      { id: 'lotus_high',   x: 4820, y: 155, type: 'lotus',   name: 'Cloud-Lotus Bloom', found: false, glow: 0 },
+      { id: 'shrine_mid',   x: 5220, y: 195, type: 'shrine',  name: 'Shrine of First Flight', found: false, glow: 0 },
+      { id: 'arch_east',    x: 5610, y: 310, type: 'lantern', name: 'Sun-Arch Brazier', found: false, glow: 0 },
+      { id: 'altar_crown',  x: 5230, y: 75,  type: 'lotus',   name: 'Sky-Crown Reliquary', found: false, glow: 0 },
+      { id: 'star_isle',    x: 5910, y: 235, type: 'shrine',  name: 'Star-Weaver Monolith', found: false, glow: 0 },
+    ];
+  }
+
+  addHeartOrNote(x, y, kind = 'heart') {
+    this.hearts.push({
+      x: x + (Math.random() - 0.5) * 20,
+      y: y + (Math.random() - 0.5) * 10,
+      vx: (Math.random() - 0.5) * 28,
+      vy: -28 - Math.random() * 24,
+      life: 0,
+      max: 1.5 + Math.random() * 0.8,
+      kind,
+      ph: Math.random() * 6.28,
+    });
+  }
+
+  solids(act, gust, fall) {
+    const s = [];
+    if (act === 1 || act === 4 || act === 5) {
+      s.push({ x: -600, y: GROUND_Y, w: ROOF_END + 600, h: 4000 });
+      for (const cx of CHIMNEYS) s.push({ x: cx, y: GROUND_Y - 40, w: 30, h: 40 });
+      for (const ac of this.acUnits) s.push({ x: ac.x, y: ac.y, w: ac.w, h: ac.h });
+    }
+    if (act === 2 || (act === 3 && !fall) || act === 5 || (act === 4 && gust > 0)) {
+      for (const p of PLATS) s.push({ x: p.x, y: p.y, w: p.w, h: 14, oneWay: true });
+    }
+    return s;
+  }
+
+  chimneyH(x) {
+    for (const cx of CHIMNEYS) if (x > cx - 2 && x < cx + 32) return 40;
+    for (const ac of this.acUnits) if (x > ac.x - 2 && x < ac.x + ac.w + 2) return ac.h;
+    return 0;
+  }
+
+  spawnTwig(x) {
+    this.twigs.push({ x, vx: 0, state: 'rest', age: 0, d: 0, y: GROUND_Y, ph: Math.random() * 6 });
+    this.addDust(x, GROUND_Y - 6, 10, 0.6);
+  }
+  restingTwigs() { return this.twigs.filter((t) => t.state === 'rest').length; }
+
+  nudge(player) {
+    let best = null, bd = 155;
+    for (const t of this.twigs) if (t.state === 'rest') { const d = Math.abs(t.x - player.x); if (d < bd) { bd = d; best = t; } }
+    if (best) { best.vx = Math.max(best.vx, 480); this.events.push({ type: 'nudge' }); return true; }
+    return false;
+  }
+
+  squallHit(x) { return !!this.squall && Math.abs(x - this.squall.x) < this.squall.w / 2; }
+
+  addDust(x, y, n, spread = 1, col = null) {
+    for (let i = 0; i < n; i++) {
+      this.dust.push({
+        x: x + (Math.random() - 0.5) * 14 * spread,
+        y: y + (Math.random() - 0.5) * 10 * spread,
+        vx: (Math.random() - 0.5) * 55 * spread,
+        vy: -12 - Math.random() * 45 * spread,
+        life: 0, max: 0.8 + Math.random() * 0.9,
+        s: 1.1 + Math.random() * 1.9,
+        col,
+      });
+    }
+  }
+
+  spawnEmbers(cx, cy) {
+    for (let i = 0; i < 150; i++) {
+      this.embers.push({
+        x: cx + (Math.random() - 0.5) * 260,
+        y: cy - 110 + Math.random() * 300,
+        vx: (Math.random() - 0.5) * 60,
+        vy: -20 - Math.random() * 70,
+        life: 0, max: 3 + Math.random() * 4.5,
+        s: 1.2 + Math.random() * 2.6,
+      });
+    }
+  }
+
+  spawnCrow(x, y, aggressive = false) {
+    const hp = aggressive ? 2 : 2;
+    this.crows.push({
+      x, y, baseY: y,
+      vx: -60, vy: 0,
+      hp, maxHp: hp,
+      state: 'patrol', // patrol | telegraph | swoop | recover | dead
+      stateT: 1.1 + Math.random() * 1.4,
+      facing: -1,
+      phase: Math.random() * 6.28,
+      hurtT: 0,
+      targetX: x, targetY: y,
+    });
+  }
+
+  update(dt, g, player) {
+    this.time += dt;
+    const { vw, vh } = g;
+
+    // Rain
+    const n = Math.floor(this.rain.length * clamp(g.rain, 0, 1));
+    for (let i = 0; i < n; i++) {
+      const p = this.rain[i];
+      p.y += p.vy * dt; p.x += (p.vx - g.windVis * 500) * dt;
+      if (p.y > vh + 10) { p.y = -20; p.x = Math.random() * (vw + 300) - 100; }
+      if (p.x < -80) p.x += vw + 160;
+    }
+
+    // Wind streaks
+    if (g.windVis > 0.01) {
+      for (const s of this.streaks) {
+        s.x -= s.s * dt * (0.6 + g.windVis * 0.6);
+        if (s.x < -s.l) { s.x = vw + Math.random() * 300; s.y0 = Math.random() * vh; s.y = s.y0; }
+        let pushed = false;
+        if (g.parting) {
+          const dx = s.x - g.px, dy = s.y - g.py, R = 54;
+          if (dx > -30 && dx < 130 && Math.abs(dy) < R) { s.y += (dy >= 0 ? 1 : -1) * (R - Math.abs(dy)) * dt * 12; pushed = true; }
+        }
+        if (!pushed) s.y += (s.y0 - s.y) * Math.min(1, dt * 2);
+      }
+    }
+
+    // Petals
+    for (const p of this.petals) {
+      p.ph += dt; p.x += (p.vx + Math.sin(p.ph) * 12) * dt; p.y += (p.vy + Math.cos(p.ph * 1.3) * 6) * dt;
+      if (p.x < -10) { p.x = vw + 10; p.y = Math.random() * vh; }
+      if (p.y > vh + 10) { p.y = -10; p.x = Math.random() * vw; }
+    }
+
+    // Dust, embers, motes, hearts
+    for (const d of this.dust) { d.life += dt; d.x += d.vx * dt; d.y += d.vy * dt; d.vy += 10 * dt; }
+    this.dust = this.dust.filter((d) => d.life < d.max);
+    for (const h of this.hearts) {
+      h.life += dt;
+      h.x += (h.vx + Math.sin(h.life * 3 + h.ph) * 14) * dt;
+      h.y += h.vy * dt;
+    }
+    this.hearts = this.hearts.filter((h) => h.life < h.max);
+    for (const e of this.embers) { e.life += dt; e.x += (e.vx + Math.sin(e.life * 2 + e.s) * 18) * dt; e.y += e.vy * dt; }
+    this.embers = this.embers.filter((e) => e.life < e.max);
+    if (g.gustI > 0.05 && Math.random() < dt * 50 * g.gustI) {
+      this.motes.push({ x: ROOF_END - 90 + Math.random() * 240, y: GROUND_Y + 30, vx: 20 + Math.random() * 50, vy: -(110 + Math.random() * 90), life: 0, max: 2.2 + Math.random() });
+    }
+    for (const m of this.motes) { m.life += dt; m.x += m.vx * dt; m.y += m.vy * dt; }
+    this.motes = this.motes.filter((m) => m.life < m.max);
+    this.flash = Math.max(0, this.flash - dt * 1.2);
+
+    // Companion phase, reveal progress & bonding animations
+    this.comp.phase += dt;
+    if (this.comp.revealed) {
+      this.comp.revealProgress = Math.min(1, this.comp.revealProgress + dt * 0.9);
+    }
+    if (this.comp.bondAnim) {
+      this.comp.bondAnim.t += dt;
+      if (this.comp.bondAnim.t >= this.comp.bondAnim.dur) {
+        this.comp.bondAnim = null;
+      }
+    }
+
+    // Paradise Wonders Discovery
+    if (g.act === 2 || g.act === 5) {
+      for (const w of this.wonders) {
+        if (w.found) {
+          w.glow = Math.min(1, w.glow + dt * 1.8);
+          if (Math.random() < dt * 8) this.addDust(w.x, w.y - 18, 1, 0.9, '#ffe28a');
+        } else {
+          const dist = Math.hypot(player.x - w.x, (player.y - 12) - (w.y - 16));
+          if (dist < 46) {
+            w.found = true;
+            w.glow = 0.2;
+            this.addDust(w.x, w.y - 18, 28, 2.2, '#ffd978');
+            this.events.push({ type: 'wonderFound', wonder: w });
+          }
+        }
+      }
+    }
+
+    // Mundane Rooftop Hazards & Hostile Crows (Acts 1 and 4)
+    const inAct1Mundane = g.act === 1 && !g.ride && !g.introActive;
+    const inAct4Mundane = g.act === 4 && player.x < ROOF_END - 40;
+    if (inAct1Mundane || inAct4Mundane) {
+      this.updateMundaneHazardsAndCrows(dt, g, player);
+    } else if (g.act !== 1 && g.act !== 4) {
+      this.crows.length = 0;
+    }
+
+    // Companion's torn golden keepsake feather on the slate roof in Act 4
+    if (g.act === 4 && this.keepsakeFeather && !this.keepsakeFeather.collected) {
+      const kf = this.keepsakeFeather;
+      kf.age += dt;
+      if (Math.hypot(player.x - kf.x, (player.y - 10) - kf.y) < 34 && kf.age > 1.8) {
+        kf.collected = true;
+        player.heal(35);
+        this.addDust(kf.x, kf.y, 28, 2.2, '#ffe082');
+        this.events.push({ type: 'keepsakePicked' });
+      }
+    }
+
+    // Healing Feather / Ember pickups dropped by defeated crows
+    for (const f of this.feathers) {
+      f.age += dt;
+      f.y = f.baseY + Math.sin(this.time * 4 + f.ph) * 4;
+      if (Math.hypot(player.x - f.x, (player.y - 10) - f.y) < 28) {
+        f.dead = true;
+        player.heal(22);
+        this.addDust(f.x, f.y, 14, 1.4, '#ffd470');
+        this.events.push({ type: 'emberPickup' });
+      }
+    }
+    this.feathers = this.feathers.filter((f) => !f.dead && f.age < 18);
+
+    // Squall in Act 4
+    if (g.act === 4) {
+      this.squallT -= dt;
+      if (!this.squall && this.squallT <= 0) { this.squall = { x: g.cam.x - 500, w: 460, s: 320 }; this.squallT = 13 + Math.random() * 9; }
+      if (this.squall) { this.squall.x += this.squall.s * dt; if (this.squall.x > g.cam.x + vw + 600) this.squall = null; }
+    } else this.squall = null;
+
+    // Twigs in Act 4
+    for (const t of this.twigs) {
+      t.age += dt;
+      if (t.state === 'rest') {
+        const dx = t.x - player.x;
+        if (g.act === 4 && Math.abs(dx) < 26 && player.y > GROUND_Y - 52 && Math.abs(player.vx) > 8 && Math.sign(dx) === Math.sign(player.vx)) {
+          t.vx = player.vx * 1.15 + Math.sign(player.vx) * 35;
+        }
+        if (player.attackHitbox && Math.abs(t.x - (player.attackHitbox.x + 26)) < 44 && Math.abs(GROUND_Y - player.y) < 55) {
+          t.vx = Math.max(t.vx, 500);
+          this.events.push({ type: 'nudge' });
+        }
+        t.x += t.vx * dt;
+        t.vx -= Math.sign(t.vx) * Math.min(Math.abs(t.vx), 280 * dt);
+        if (t.x < g.minX + 20) { t.x = g.minX + 20; t.vx = 0; }
+        if (t.x > ROOF_END - 4) { t.state = 'drift'; t.d = 0; t.y = GROUND_Y - this.chimneyH(t.x) - 6; this.events.push({ type: 'twigLaunch' }); }
+      } else {
+        t.d += dt; t.x += 160 * dt; t.y -= (65 + 42 * t.d) * dt;
+        if (Math.random() < dt * 40) this.motes.push({ x: t.x, y: t.y, vx: -10, vy: -15, life: 0, max: 1 });
+        if (t.d > 2.3) { t.dead = true; this.flash = 1; this.events.push({ type: 'twigArrive' }); }
+      }
+    }
+    this.twigs = this.twigs.filter((t) => !t.dead);
+  }
+
+  updateMundaneHazardsAndCrows(dt, g, player) {
+    // 1. Steam Vents (periodic scalding soot/steam columns)
+    for (const sv of this.steamVents) {
+      const cycle = (this.time + sv.phase) % 4.2;
+      sv.active = cycle > 2.4 && cycle < 3.9;
+      if (sv.active && Math.abs(player.x - sv.x) < 18 && player.y > GROUND_Y - 105 && player.y <= GROUND_Y + 5) {
+        if (player.takeDamage(14, player.x < sv.x ? -1 : 1)) {
+          this.addDust(player.x, player.y - 12, 12, 1.4, '#ff7766');
+        }
+      }
+    }
+
+    // 2. Spiked Rooftop Antennas
+    for (const ant of this.antennas) {
+      if (
+        player.x + 8 > ant.x &&
+        player.x - 8 < ant.x + ant.w &&
+        player.y > ant.y + 4 &&
+        player.y - 16 < ant.y + 24
+      ) {
+        if (player.takeDamage(12, player.vx >= 0 ? -1 : 1)) {
+          this.addDust(player.x, player.y - 12, 12, 1.3, '#ff7766');
+        }
+      }
+    }
+
+    // 3. Sparking Overhead Wires (if jumping into the live spark node)
+    for (const pole of this.powerPoles) {
+      const sparkOn = ((this.time * 2 + pole.sparkPhase) % 3.5) > 2.5;
+      if (sparkOn && Math.hypot(player.x - (pole.x + 90), (player.y - 10) - (pole.y + 18)) < 22) {
+        if (player.takeDamage(14, -player.facing)) {
+          this.addDust(pole.x + 90, pole.y + 18, 16, 1.5, '#99e5ff');
+        }
+      }
+    }
+
+    // 4. Crow Spawning (Active in both Act 1 and Act 4!)
+    const maxCrows = g.act === 4 ? 4 : 2;
+    this.crowSpawnT -= dt;
+    if (this.crowSpawnT <= 0 && this.crows.length < maxCrows && player.x < ROOF_END - 120) {
+      const spawnRight = Math.random() < 0.65 || player.x < g.minX + 260;
+      const offset = spawnRight ? (240 + Math.random() * 200) : (-220 - Math.random() * 180);
+      const sx = clamp(
+        player.x + offset,
+        g.minX + 60,
+        ROOF_END - 90
+      );
+      const sy = GROUND_Y - 125 - Math.random() * 65;
+      this.spawnCrow(sx, sy, g.act === 4);
+      this.crowSpawnT = g.act === 4 ? 2.2 + Math.random() * 1.8 : 4.2 + Math.random() * 2.5;
+    }
+
+    // 5. Update Crows & Combat Interactions
+    for (const c of this.crows) {
+      c.phase += dt * (c.state === 'swoop' ? 18 : 11);
+      c.hurtT = Math.max(0, c.hurtT - dt);
+      c.stateT -= dt;
+
+      if (c.state === 'patrol') {
+        const hoverX = player.x + Math.sin(this.time * 1.3 + c.baseY) * 130;
+        const dx = hoverX - c.x;
+        c.vx += clamp(dx * 2.2 - c.vx, -240 * dt, 240 * dt);
+        c.x += c.vx * dt;
+        c.y = lerp(c.y, c.baseY + Math.sin(this.time * 3 + c.phase) * 14, dt * 4);
+        c.facing = player.x >= c.x ? 1 : -1;
+
+        if (c.stateT <= 0 && Math.abs(player.x - c.x) < 280) {
+          c.state = 'telegraph';
+          c.stateT = 0.55;
+          c.targetX = player.x;
+          c.targetY = player.y - 12;
+          this.events.push({ type: 'crowCaw' });
+        }
+      } else if (c.state === 'telegraph') {
+        c.x -= c.facing * 35 * dt;
+        c.y -= 28 * dt;
+        c.facing = c.targetX >= c.x ? 1 : -1;
+        if (c.stateT <= 0) {
+          c.state = 'swoop';
+          c.stateT = 0.95;
+          const dx = player.x - c.x;
+          const dy = (player.y - 12) - c.y;
+          const dist = Math.hypot(dx, dy) || 1;
+          const spd = g.act === 4 ? 360 : 310;
+          c.vx = (dx / dist) * spd;
+          c.vy = (dy / dist) * spd;
+          c.facing = c.vx >= 0 ? 1 : -1;
+        }
+      } else if (c.state === 'swoop') {
+        c.x += c.vx * dt;
+        c.y += c.vy * dt;
+        if (c.y > GROUND_Y - 14) {
+          c.y = GROUND_Y - 14;
+          c.vy = -120;
+        }
+        if (c.stateT <= 0) {
+          c.state = 'recover';
+          c.stateT = 1.1;
+        }
+      } else if (c.state === 'recover') {
+        c.vx *= 0.95;
+        c.vy = -135;
+        c.x += c.vx * dt;
+        c.y += c.vy * dt;
+        if (c.y <= c.baseY || c.stateT <= 0) {
+          c.state = 'patrol';
+          c.stateT = 1.4 + Math.random() * 1.4;
+        }
+      }
+
+      // Check if Player's Wing-Slash hits Crow
+      if (player.attackHitbox && c.hurtT <= 0) {
+        const hb = player.attackHitbox;
+        if (c.x + 16 > hb.x && c.x - 16 < hb.x + hb.w && c.y + 14 > hb.y && c.y - 14 < hb.y + hb.h) {
+          c.hp -= 1;
+          c.hurtT = 0.28;
+          c.vx = hb.dir * 260;
+          c.vy = -170;
+          c.state = 'recover';
+          c.stateT = 0.85;
+          this.addDust(c.x, c.y, 16, 1.5, '#ffd470');
+          this.events.push({ type: 'crowHit' });
+
+          if (c.hp <= 0) {
+            c.dead = true;
+            this.addDust(c.x, c.y, 26, 2.0, '#ffd470');
+            this.feathers.push({
+              x: c.x,
+              y: Math.min(c.y, GROUND_Y - 24),
+              baseY: Math.min(c.y, GROUND_Y - 24),
+              age: 0,
+              ph: Math.random() * 6.28,
+            });
+            this.events.push({ type: 'crowDefeated' });
+          }
+        }
+      }
+
+      // Check if Crow hits Player
+      if (!c.dead && c.hurtT <= 0 && Math.hypot(player.x - c.x, (player.y - 11) - c.y) < 20) {
+        if (player.takeDamage(16, player.x < c.x ? -1 : 1)) {
+          c.vx = -c.vx * 0.7;
+          c.vy = -160;
+          c.state = 'recover';
+          c.stateT = 1.0;
+          this.addDust(player.x, player.y - 12, 14, 1.4, '#ff7766');
+        }
+      }
+    }
+
+    this.crows = this.crows.filter((c) => !c.dead && Math.abs(c.x - player.x) < 950);
+  }
+
+  pal(g) {
+    const e = g.eg, m = (a, b) => mix(a, b, e);
+    return {
+      skyTop: m('#4b5563', '#e8895a'), skyMid: m('#667180', '#f6b77d'), skyBot: m('#7c8794', '#ffd9a6'),
+      cloud: m('#8d97a3', '#ffcfa5'), cloudShade: m('#6b7581', '#f0a584'),
+      far: m('#46505b', '#a6685a'), near: m('#2b323a', '#6a4440'), litWin: m('#5c6773', '#ffc27a'),
+      roof: m('#1e2329', '#4a3a33'), roofLine: m('#2c343c', '#6a5446'), roofHi: m('#7c8794', '#ffd29a'),
+      brick: m('#3a3f46', '#8a4d3a'), brickDark: m('#2a2e34', '#5f3328'), pipe: m('#313840', '#7a5a46'),
+      pine: m('#26303a', '#2f5a3c'), pineLight: m('#33404b', '#4f8a56'), bark: m('#2c2f33', '#6a4630'), rock: m('#2f353c', '#7a5c48'),
+    };
+  }
+
+  drawBack(ctx, g) {
+    const { vw, vh } = g, P = this.pal(g), e = g.eg;
+    const gr = ctx.createLinearGradient(0, 0, 0, vh);
+    gr.addColorStop(0, P.skyTop); gr.addColorStop(0.6, P.skyMid); gr.addColorStop(1, P.skyBot);
+    ctx.fillStyle = gr; ctx.fillRect(0, 0, vw, vh);
+    if (e > 0.02) {
+      const sg = ctx.createRadialGradient(vw * 0.72, vh * 0.6, 10, vw * 0.72, vh * 0.6, vh * 1.0);
+      sg.addColorStop(0, rgba('#fff0c0', 0.65 * e)); sg.addColorStop(1, rgba('#ffd9a0', 0));
+      ctx.fillStyle = sg; ctx.fillRect(0, 0, vw, vh);
+    }
+    if (g.clock.vis) this.drawClock(ctx, g, P);
+
+    // Distant golden ridge
+    const ox = -(g.cam.x / 5000) * 60, oy = -g.cam.y * 0.05;
+    const ra = lerp(0.3, 1, e);
+    ctx.globalAlpha = ra;
+    ctx.fillStyle = mix('#c9a35a', '#a8604a', e);
+    ctx.beginPath(); ctx.moveTo(vw * 0.3 + ox, vh + 40);
+    for (const [px, py] of RIDGE) ctx.lineTo(vw * (0.3 + 0.7 * px) + ox + 60, vh * py + oy);
+    ctx.lineTo(vw + 100, vh + 40); ctx.closePath(); ctx.fill();
+    if (e < 0.9) {
+      const gx = vw * (0.3 + 0.7 * 0.55) + ox + 60, gy = vh * 0.44 + oy;
+      const pulse = 0.75 + 0.25 * Math.sin(this.time * 1.4);
+      const pg = ctx.createRadialGradient(gx, gy, 2, gx, gy, 110);
+      pg.addColorStop(0, rgba('#ffd27a', 0.55 * pulse * (1 - e))); pg.addColorStop(1, rgba('#ffd27a', 0));
+      ctx.globalAlpha = 1; ctx.fillStyle = pg; ctx.fillRect(gx - 120, gy - 120, 240, 240);
+    }
+    ctx.globalAlpha = 1;
+
+    if (this.flash > 0) {
+      const gx = vw * 0.78 + ox, gy = vh * 0.5 + oy;
+      const fg = ctx.createRadialGradient(gx, gy, 0, gx, gy, 140 * (0.6 + this.flash * 0.6));
+      fg.addColorStop(0, rgba('#fff0b0', 0.95 * this.flash)); fg.addColorStop(0.3, rgba('#ffc860', 0.5 * this.flash)); fg.addColorStop(1, rgba('#ffc860', 0));
+      ctx.fillStyle = fg; ctx.fillRect(gx - 160, gy - 160, 320, 320);
+    }
+    this.drawClouds(ctx, g, P, 0.15, vh * 0.80, 0.8);
+
+    const ca = 1 - smooth(g.grade * 1.1);
+    if (ca > 0.02) {
+      ctx.globalAlpha = ca;
+      this.drawSkyline(ctx, g, this.sky2, 0.16, P.far, vh * 0.78, P.litWin, false);
+      const fg = ctx.createLinearGradient(0, vh * 0.55, 0, vh);
+      fg.addColorStop(0, rgba(P.skyBot, 0)); fg.addColorStop(1, rgba(P.skyBot, 0.55));
+      ctx.fillStyle = fg; ctx.fillRect(0, vh * 0.55, vw, vh * 0.45);
+      this.drawSkyline(ctx, g, this.sky1, 0.34, P.near, vh * 0.9, P.litWin, true);
+      ctx.globalAlpha = 1;
+    }
+    this.drawClouds(ctx, g, P, 0.3, vh * 0.97, 0.55 + 0.4 * e);
+  }
+
+  drawClouds(ctx, g, P, f, y, a) {
+    const { vw } = g, span = vw + 400;
+    ctx.globalAlpha = a;
+    for (let k = 0; k < 16; k++) {
+      const cx = ((((k * 150 + this.time * 7 * (1 + f) - g.cam.x * f) % span) + span) % span) - 200;
+      const cy = y + Math.sin(k * 2.1) * 12 - g.cam.y * f * 0.3;
+      ctx.fillStyle = k % 2 ? P.cloudShade : P.cloud;
+      ctx.beginPath(); ctx.ellipse(cx, cy, 120, 34, 0, 0, Math.PI * 2); ctx.ellipse(cx + 70, cy - 12, 80, 28, 0, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  drawSkyline(ctx, g, S, f, color, baseY, lit, windows) {
+    const { vw, cam } = g;
+    let x = -((cam.x * f) % S.total);
+    const oy = -cam.y * f * 0.4;
+    while (x < vw) {
+      for (const b of S.a) {
+        if (x + b.w > 0 && x < vw) {
+          ctx.fillStyle = color; ctx.fillRect(x, baseY - b.h + oy, b.w + 1, b.h + 500);
+          if (windows) { ctx.fillStyle = lit; for (const [wx, wy] of b.wins) ctx.fillRect(x + wx, baseY - b.h + wy + oy, 4, 6); }
+        }
+        x += b.w;
+        if (x >= vw) break;
+      }
+    }
+  }
+
+  drawClock(ctx, g, P) {
+    const { vw } = g, c = g.clock, cx = vw / 2 + (c.shake ? (Math.random() - 0.5) * 3 * c.crack : 0);
+    const w = 270, x = cx - w / 2, top = 14, h = 420;
+    ctx.save();
+    ctx.globalAlpha = (1 - 0.85 * g.eg) * c.alpha;
+    const bg = ctx.createLinearGradient(x, 0, x + w, 0);
+    bg.addColorStop(0, '#1c2127'); bg.addColorStop(0.5, '#2c333b'); bg.addColorStop(1, '#1a1f24');
+    ctx.fillStyle = bg; ctx.fillRect(x, top, w, h);
+    ctx.strokeStyle = 'rgba(150,162,176,.35)'; ctx.lineWidth = 2; ctx.strokeRect(x + 6, top + 6, w - 12, h - 12);
+    for (let i = 0; i < 12; i++) { ctx.fillStyle = 'rgba(150,162,176,.25)'; ctx.fillRect(x + 20 + i * ((w - 40) / 11) - 1, top + 22, 2, i % 3 === 0 ? 14 : 8); }
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = 'rgba(160,172,186,.6)'; ctx.font = '13px Georgia, serif';
+    if ('letterSpacing' in ctx) ctx.letterSpacing = '6px';
+    ctx.fillText('THE SEASON TURNS', cx + 3, top + 62);
+    if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
+    const pulse = 1 + (c.pulse || 0) * 0.04;
+    ctx.save(); ctx.translate(cx, top + 170); ctx.scale(pulse, pulse);
+    ctx.font = 'bold 74px "Courier New", ui-monospace, monospace';
+    ctx.shadowColor = rgba('#ffd27a', 0.8 * c.flash); ctx.shadowBlur = 30 * c.flash;
+    ctx.fillStyle = mix('#a9b4c0', '#ffe2a0', c.flash);
+    ctx.fillText(c.text, 0, 0);
+    ctx.restore();
+    if (c.crack > 0) {
+      ctx.strokeStyle = rgba('#ffcf80', 0.9 * c.crack); ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(cx - 20, top); ctx.lineTo(cx + 10, top + 90); ctx.lineTo(cx - 14, top + 170); ctx.lineTo(cx + 24, top + 260); ctx.lineTo(cx - 6, top + h);
+      ctx.moveTo(cx + 10, top + 90); ctx.lineTo(cx + 70, top + 130); ctx.moveTo(cx - 14, top + 170); ctx.lineTo(cx - 80, top + 220);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  drawScene(ctx, g) {
+    const P = this.pal(g);
+    this.drawRoofs(ctx, g, P);
+    if (g.act === 1 && g.player.x < 340) this.drawPrologueNest(ctx, g);
+    if (g.act === 4 && this.keepsakeFeather && !this.keepsakeFeather.collected) {
+      this.drawKeepsakeFeather(ctx, this.keepsakeFeather);
+    }
+    if (g.act === 1 || g.gustI > 0.02) this.drawGust(ctx, g);
+    const ma = smooth(g.grade * 1.05);
+    if (ma > 0.01) this.drawMountain(ctx, g, P, ma);
+    for (const t of this.twigs) this.drawTwig(ctx, t);
+    for (const f of this.feathers) this.drawFeatherDrop(ctx, f);
+    for (const c of this.crows) this.drawCrow(ctx, c);
+  }
+
+  drawPrologueNest(ctx, g) {
+    const nx = 96, ny = GROUND_Y;
+    ctx.save();
+    ctx.translate(nx, ny);
+    ctx.fillStyle = '#332922';
+    ctx.beginPath();
+    ctx.ellipse(0, -3, 18, 5.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#4d3e33';
+    ctx.lineWidth = 1.4;
+    for (let i = -14; i <= 14; i += 4) {
+      ctx.beginPath();
+      ctx.moveTo(i, -2);
+      ctx.lineTo(i + (i % 3) * 3, -7);
+      ctx.stroke();
+    }
+    const p = 0.6 + 0.4 * Math.sin(this.time * 3);
+    const gl = ctx.createRadialGradient(4, -7, 1, 4, -7, 16);
+    gl.addColorStop(0, `rgba(255, 208, 110, ${0.55 * p})`);
+    gl.addColorStop(1, 'rgba(255, 208, 110, 0)');
+    ctx.fillStyle = gl;
+    ctx.fillRect(-14, -24, 36, 30);
+    ctx.fillStyle = '#e6b865';
+    ctx.beginPath();
+    ctx.ellipse(4, -6, 6, 2.2, -0.35, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  drawKeepsakeFeather(ctx, kf) {
+    ctx.save();
+    ctx.translate(kf.x, kf.y);
+    const pulse = 0.65 + 0.35 * Math.sin(this.time * 4.5);
+    const gl = ctx.createRadialGradient(0, -6, 2, 0, -6, 36);
+    gl.addColorStop(0, `rgba(255, 215, 110, ${0.9 * pulse})`);
+    gl.addColorStop(0.5, `rgba(255, 170, 70, ${0.4 * pulse})`);
+    gl.addColorStop(1, 'rgba(255, 170, 70, 0)');
+    ctx.fillStyle = gl;
+    ctx.fillRect(-40, -42, 80, 80);
+
+    ctx.rotate(-0.2 + Math.sin(this.time * 2.5) * 0.08);
+    ctx.fillStyle = '#ffd978';
+    ctx.beginPath();
+    ctx.ellipse(0, -5, 11, 3.6, -0.25, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#fff4d4';
+    ctx.beginPath();
+    ctx.ellipse(4, -6, 4.5, 2.0, -0.25, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  drawRoofs(ctx, g, P) {
+    const L = Math.max(g.x0, -600), R = Math.min(g.x1, ROOF_END);
+    if (R <= L) return;
+    ctx.fillStyle = P.roof; ctx.fillRect(L, GROUND_Y, R - L, 2000);
+    ctx.strokeStyle = P.roofLine; ctx.lineWidth = 1; ctx.beginPath();
+    for (let row = 0; row < 7; row++) {
+      const y = GROUND_Y + 8 + row * 18;
+      ctx.moveTo(L, y); ctx.lineTo(R, y);
+      const off = (row % 2) * 18;
+      for (let x = Math.floor(L / 36) * 36 + off; x < R; x += 36) if (x > L) { ctx.moveTo(x, y); ctx.lineTo(x, y + 18); }
+    }
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(0,0,0,.35)';
+    for (let x = Math.ceil(L / 700) * 700; x < R; x += 700) ctx.fillRect(x - 3, GROUND_Y, 6, 2000);
+    ctx.fillStyle = rgba(P.roofHi, 0.35); ctx.fillRect(L, GROUND_Y, R - L, 2);
+
+    // Chimneys
+    for (const cx of CHIMNEYS) {
+      if (cx + 40 < L || cx > R) continue;
+      ctx.fillStyle = P.brick; ctx.fillRect(cx, GROUND_Y - 40, 30, 40);
+      ctx.fillStyle = P.brickDark;
+      for (let k = 1; k < 5; k++) ctx.fillRect(cx, GROUND_Y - 40 + k * 8 - 1, 30, 1.5);
+      for (let k = 0; k < 5; k++) ctx.fillRect(cx + 8 + ((k % 2) * 12), GROUND_Y - 40 + k * 8, 1.5, 8);
+      ctx.fillRect(cx - 3, GROUND_Y - 44, 36, 6);
+      ctx.fillStyle = '#12161a'; ctx.fillRect(cx + 6, GROUND_Y - 44, 18, 3);
+      const vx = cx + 215;
+      ctx.fillStyle = P.pipe; ctx.fillRect(vx, GROUND_Y - 26, 7, 26);
+      ctx.beginPath(); ctx.ellipse(vx + 3.5, GROUND_Y - 27, 8, 4, 0, Math.PI, 0); ctx.fill();
+    }
+
+    // Industrial AC Units
+    for (const ac of this.acUnits) {
+      if (ac.x + ac.w < L || ac.x > R) continue;
+      ctx.fillStyle = '#262d35';
+      ctx.fillRect(ac.x, ac.y, ac.w, ac.h);
+      ctx.strokeStyle = '#3b4552';
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(ac.x + 1, ac.y + 1, ac.w - 2, ac.h - 2);
+      ctx.fillStyle = '#15191e';
+      for (let y = ac.y + 5; y < ac.y + ac.h - 4; y += 4) {
+        ctx.fillRect(ac.x + 5, y, ac.w - 10, 2);
+      }
+    }
+
+    // Spiked Rooftop TV Antennas with blinking red hazard light
+    for (const ant of this.antennas) {
+      if (ant.x + 30 < L || ant.x - 30 > R) continue;
+      ctx.strokeStyle = '#404a56';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(ant.x + 7, GROUND_Y);
+      ctx.lineTo(ant.x + 7, ant.y);
+      ctx.moveTo(ant.x - 9, ant.y + 16);
+      ctx.lineTo(ant.x + 23, ant.y + 16);
+      ctx.moveTo(ant.x - 6, ant.y + 28);
+      ctx.lineTo(ant.x + 20, ant.y + 28);
+      ctx.stroke();
+
+      const blink = Math.sin(this.time * 5 + ant.x) > 0.1;
+      if (blink) {
+        ctx.fillStyle = '#ff4949';
+        ctx.beginPath();
+        ctx.arc(ant.x + 7, ant.y, 2.8, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    // Steam / Soot Vents
+    for (const sv of this.steamVents) {
+      if (sv.x + 30 < L || sv.x - 30 > R) continue;
+      ctx.fillStyle = '#2d343c';
+      ctx.fillRect(sv.x - 8, GROUND_Y - 8, 16, 8);
+      if (sv.active) {
+        ctx.save();
+        for (let k = 0; k < 7; k++) {
+          const prog = ((this.time * 3.5 + k * 0.15) % 1);
+          const py = GROUND_Y - 12 - prog * 92;
+          const px = sv.x + Math.sin(prog * 8 + this.time * 6) * 7;
+          const rad = 5 + prog * 14;
+          ctx.fillStyle = `rgba(210, 220, 230, ${(1 - prog) * 0.42})`;
+          ctx.beginPath();
+          ctx.arc(px, py, rad, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.restore();
+      }
+    }
+
+    // Overhead Power Poles & Sparking Wires
+    for (const pole of this.powerPoles) {
+      if (pole.x + 200 < L || pole.x - 20 > R) continue;
+      ctx.fillStyle = '#232830';
+      ctx.fillRect(pole.x, pole.y, 5, GROUND_Y - pole.y);
+      ctx.fillRect(pole.x - 10, pole.y + 6, 25, 3);
+      ctx.strokeStyle = 'rgba(30, 36, 44, 0.75)';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(pole.x + 2, pole.y + 7);
+      ctx.quadraticCurveTo(pole.x + 90, pole.y + 28, pole.x + 180, pole.y + 7);
+      ctx.stroke();
+
+      const sparkOn = ((this.time * 2 + pole.sparkPhase) % 3.5) > 2.5;
+      if (sparkOn) {
+        const sx = pole.x + 90, sy = pole.y + 18;
+        ctx.strokeStyle = '#99e8ff';
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        for (let a = 0; a < 5; a++) {
+          ctx.moveTo(sx, sy);
+          ctx.lineTo(sx + (Math.random() - 0.5) * 24, sy + (Math.random() - 0.5) * 24);
+        }
+        ctx.stroke();
+      }
+    }
+
+    if (ROOF_END >= L && ROOF_END <= R + 1) {
+      ctx.fillStyle = P.roofLine; ctx.fillRect(ROOF_END - 8, GROUND_Y - 2, 8, 2000);
+      ctx.fillStyle = P.pipe; ctx.fillRect(ROOF_END - 20, GROUND_Y + 4, 6, 400);
+    }
+  }
+
+  drawCrow(ctx, c) {
+    ctx.save();
+    ctx.translate(c.x, c.y);
+
+    // Telegraph warning ring before swooping
+    if (c.state === 'telegraph') {
+      ctx.strokeStyle = 'rgba(255, 85, 70, 0.85)';
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      ctx.arc(0, -6, 18 + Math.sin(this.time * 25) * 4, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    // Crow Health Bar when damaged or telegraphing
+    if (c.hp < c.maxHp || c.state === 'telegraph') {
+      const bw = 24, bh = 3.5;
+      ctx.fillStyle = 'rgba(10, 12, 16, 0.75)';
+      ctx.fillRect(-bw / 2, -28, bw, bh);
+      ctx.fillStyle = '#ff574a';
+      ctx.fillRect(-bw / 2, -28, bw * (c.hp / c.maxHp), bh);
+    }
+
+    ctx.scale(c.facing, 1);
+    const flap = Math.sin(c.phase) * 11;
+
+    // Shadowy crow body
+    ctx.fillStyle = c.hurtT > 0 ? '#ffffff' : '#14171c';
+    ctx.beginPath();
+    ctx.ellipse(0, -6, 11, 6.5, 0.1, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Jagged crow wing
+    ctx.fillStyle = c.hurtT > 0 ? '#ffd470' : '#1e232b';
+    ctx.beginPath();
+    ctx.moveTo(-2, -8);
+    ctx.lineTo(-10, -20 - flap);
+    ctx.lineTo(4, -14 - flap * 0.6);
+    ctx.lineTo(7, -6);
+    ctx.closePath();
+    ctx.fill();
+
+    // Sharp beak
+    ctx.fillStyle = '#3e4652';
+    ctx.beginPath();
+    ctx.moveTo(9, -9);
+    ctx.lineTo(18, -6);
+    ctx.lineTo(9, -4);
+    ctx.closePath();
+    ctx.fill();
+
+    // Glowing crimson eye
+    ctx.fillStyle = '#ff3b30';
+    ctx.beginPath();
+    ctx.arc(7.5, -8, 1.6, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+  }
+
+  drawFeatherDrop(ctx, f) {
+    ctx.save();
+    ctx.translate(f.x, f.y);
+    const gl = ctx.createRadialGradient(0, 0, 1, 0, 0, 18);
+    gl.addColorStop(0, 'rgba(255, 216, 115, 0.85)');
+    gl.addColorStop(1, 'rgba(255, 216, 115, 0)');
+    ctx.fillStyle = gl;
+    ctx.fillRect(-20, -20, 40, 40);
+
+    ctx.rotate(Math.sin(this.time * 3 + f.ph) * 0.25);
+    ctx.fillStyle = '#ffd470';
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 7, 2.6, -0.4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  drawGust(ctx, g) {
+    const I = g.act === 1 ? 1 : g.gustI;
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    for (let k = 0; k < 10; k++) {
+      const x = ROOF_END - 90 + k * 26 + Math.sin(this.time * 2 + k) * 8, w = 8 + (k % 3) * 6;
+      const gr = ctx.createLinearGradient(0, GROUND_Y + 60, 0, -200);
+      gr.addColorStop(0, rgba('#ffb85c', 0.42 * I)); gr.addColorStop(0.6, rgba('#ffd890', 0.16 * I)); gr.addColorStop(1, rgba('#ffd890', 0));
+      ctx.fillStyle = gr; ctx.fillRect(x, -200, w, GROUND_Y + 260);
+    }
+    ctx.restore();
+  }
+
+  drawMountain(ctx, g, P, a) {
+    ctx.save(); ctx.globalAlpha = a;
+    // Cloud bank
+    for (let x = 4250; x < 6200; x += 110) {
+      ctx.fillStyle = (x / 110) % 2 ? P.cloudShade : P.cloud;
+      ctx.beginPath(); ctx.ellipse(x, 500 + Math.sin(x) * 10 + Math.sin(this.time * 0.5 + x) * 3, 130, 44, 0, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.fillStyle = P.cloud; ctx.fillRect(4100, 520, 2200, 1500);
+
+    // Ancient Giant Pine Trunk
+    ctx.fillStyle = P.bark; ctx.fillRect(TRUNK_X, 65, 46, 375);
+    ctx.fillStyle = 'rgba(0,0,0,.2)'; for (let y = 90; y < 420; y += 22) ctx.fillRect(TRUNK_X + 6 + (y % 3) * 8, y, 2, 14);
+
+    // Crown Foliage
+    ctx.fillStyle = P.pine;
+    for (let k = 0; k < 6; k++) {
+      const ay = -125 + k * 40, hw = 65 + k * 25;
+      ctx.beginPath(); ctx.moveTo(TRUNK_X + 23, ay); ctx.lineTo(TRUNK_X + 23 + hw, ay + 80); ctx.lineTo(TRUNK_X + 23 - hw, ay + 80); ctx.closePath(); ctx.fill();
+    }
+
+    // Ledge A (Mossy Sanctuary Base)
+    const A = PLATS[0];
+    ctx.fillStyle = P.rock;
+    ctx.beginPath(); ctx.moveTo(A.x, A.y + 4); ctx.lineTo(A.x + A.w, A.y + 4); ctx.lineTo(A.x + A.w - 70, A.y + 85); ctx.lineTo(A.x + 90, A.y + 85); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = P.pineLight; ctx.fillRect(A.x, A.y - 2, A.w, 8);
+    for (let x = A.x; x < A.x + A.w; x += 14) { ctx.beginPath(); ctx.moveTo(x, A.y - 2); ctx.lineTo(x + 5, A.y - 9 - (x % 3) * 2); ctx.lineTo(x + 10, A.y - 2); ctx.fill(); }
+
+    // Tree Boughs & Floating Paradise Islands
+    for (let i = 1; i < PLATS.length; i++) {
+      const p = PLATS[i];
+      if (p.float) {
+        const bob = Math.sin(this.time * 1.5 + i) * 3;
+        ctx.fillStyle = P.rock;
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y + 4 + bob);
+        ctx.lineTo(p.x + p.w, p.y + 4 + bob);
+        ctx.lineTo(p.x + p.w * 0.78, p.y + 34 + bob);
+        ctx.lineTo(p.x + p.w * 0.22, p.y + 34 + bob);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = P.pineLight;
+        ctx.fillRect(p.x, p.y - 2 + bob, p.w, 7);
+      } else {
+        const tx = p.x < TRUNK_X ? TRUNK_X + 10 : TRUNK_X + 34, ex = p.x < TRUNK_X ? p.x : p.x + p.w;
+        ctx.strokeStyle = P.bark; ctx.lineWidth = 12; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(tx, p.y + 18); ctx.quadraticCurveTo((tx + ex) / 2, p.y + 14, ex, p.y + 6); ctx.stroke();
+        ctx.fillStyle = P.pine;
+        for (let x = p.x; x < p.x + p.w; x += 15) {
+          ctx.beginPath(); ctx.moveTo(x, p.y + 3); ctx.lineTo(x + 8, p.y - 11 - ((x * 7) % 5)); ctx.lineTo(x + 16, p.y + 3); ctx.fill();
+          ctx.beginPath(); ctx.moveTo(x + 2, p.y + 6); ctx.lineTo(x + 8, p.y + 24 + ((x * 3) % 6)); ctx.lineTo(x + 14, p.y + 6); ctx.fill();
+        }
+      }
+      ctx.fillStyle = rgba('#ffe0a8', 0.35 * g.eg); ctx.fillRect(p.x, p.y - 1, p.w, 2);
+    }
+
+    // Draw Discoverable Wonders
+    for (const w of this.wonders) {
+      this.drawWonder(ctx, w, P, g.eg);
+    }
+
+    // Cozy Golden Sun-Nest at the Summit
+    const c = this.comp;
+    if (c.nestProgress > 0 || g.ending) {
+      const np = g.ending ? Math.max(0.7, c.nestProgress) : c.nestProgress;
+      const nx = COMPANION.x - 14, ny = COMPANION.y;
+      ctx.save();
+      ctx.translate(nx, ny);
+      const ng = ctx.createRadialGradient(0, -6, 2, 0, -6, 46 * np);
+      ng.addColorStop(0, rgba('#ffe28a', 0.65 * np));
+      ng.addColorStop(1, rgba('#ffe28a', 0));
+      ctx.fillStyle = ng;
+      ctx.fillRect(-50, -50, 100, 70);
+
+      ctx.fillStyle = '#735135';
+      ctx.beginPath();
+      ctx.ellipse(0, -3, 22 * (0.6 + 0.4 * np), 6.5 * (0.6 + 0.4 * np), 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#ffd478';
+      ctx.lineWidth = 1.6;
+      for (let i = -14; i <= 14; i += 5) {
+        ctx.beginPath();
+        ctx.moveTo(i, -2);
+        ctx.lineTo(i + 4, -7);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    // Companion / Lover Bird & Surprise Golden Blossom Veil at Summit
+    const ca = a * (1 - 0.85 * g.mist);
+    ctx.globalAlpha = ca;
+
+    if (c.revealProgress < 1 && g.act !== 3) {
+      const veilA = 1 - c.revealProgress;
+      ctx.save();
+      const vg = ctx.createRadialGradient(COMPANION.x, COMPANION.y - 18, 4, COMPANION.x, COMPANION.y - 18, 85);
+      vg.addColorStop(0, rgba('#ffe8a3', 0.85 * veilA));
+      vg.addColorStop(0.5, rgba('#ffb86c', 0.45 * veilA));
+      vg.addColorStop(1, rgba('#ffb86c', 0));
+      ctx.fillStyle = vg;
+      ctx.beginPath(); ctx.arc(COMPANION.x, COMPANION.y - 18, 85, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = rgba('#fff4d2', 0.8 * veilA);
+      for (let k = 0; k < 8; k++) {
+        const ang = this.time * 1.8 + k * 0.785;
+        const px = COMPANION.x + Math.cos(ang) * (26 + (k % 3) * 10);
+        const py = COMPANION.y - 16 + Math.sin(ang * 1.3) * 16;
+        ctx.beginPath(); ctx.arc(px, py, 2.5, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    if (c.revealProgress > 0.05 || g.act === 3) {
+      ctx.save();
+      ctx.globalAlpha = g.act === 3 ? 1 : ca * smooth(c.revealProgress);
+      const cx = c.act3Pos ? c.act3Pos.x : COMPANION.x;
+      const cy = c.act3Pos ? c.act3Pos.y : COMPANION.y;
+      const cSpread = c.act3Pos ? c.act3Pos.spread : (0.22 + c.near * 0.38 + (c.bondAnim ? 0.35 : 0));
+      const cBob = c.bondAnim && c.bondAnim.type === 'dance'
+        ? -Math.abs(Math.sin(this.time * 12)) * 12
+        : Math.sin(this.time * 1.8) * 0.7;
+
+      drawBird(ctx, {
+        x: cx, y: cy, facing: c.facing, lean: c.lean, stage: 6,
+        spread: cSpread,
+        phase: this.time * (c.act3Pos ? 16 : 3.4),
+        amp: c.act3Pos ? 0.65 : (0.06 + c.near * 0.14 + (c.bondAnim ? 0.3 : 0)),
+        pal: COMP_PAL,
+        bob: cBob,
+        gray: 1 - g.eg,
+        hasCrest: true,
+      });
+
+      // Wholesome floating interaction prompt & Bond Hearts when near companion in Acts 2 & 5
+      if ((g.act === 2 || g.act === 5) && c.revealed && c.near > 0.35 && !g.ending && !g.loverCutscene) {
+        ctx.save();
+        ctx.translate(cx - 10, cy - 46 + Math.sin(this.time * 3) * 2.5);
+        ctx.textAlign = 'center';
+        ctx.font = '11px Georgia, serif';
+        ctx.fillStyle = 'rgba(15, 19, 25, 0.72)';
+        ctx.fillRect(-92, -11, 184, 20);
+        ctx.strokeStyle = 'rgba(255, 218, 135, 0.6)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(-92, -11, 184, 20);
+        ctx.fillStyle = '#ffe9b5';
+        const heartsStr = '♥'.repeat(Math.min(4, c.bondLevel)) + '♡'.repeat(Math.max(0, 4 - c.bondLevel));
+        ctx.fillText(`[E / ♥ BOND] Sing & Nuzzle  ${heartsStr}`, 0, 2);
+        ctx.restore();
+      }
+      ctx.restore();
+    }
+
+    if (c.near > 0.02 && g.player && (c.revealed || g.act === 3)) {
+      const cx = c.act3Pos ? c.act3Pos.x : COMPANION.x;
+      const cy = c.act3Pos ? c.act3Pos.y : COMPANION.y;
+      const mx = (cx + g.player.x) / 2, my = (cy + g.player.y) / 2 - 12;
+      const gg = ctx.createRadialGradient(mx, my, 4, mx, my, 135);
+      gg.addColorStop(0, rgba('#ffd890', 0.65 * c.near)); gg.addColorStop(1, rgba('#ffd890', 0));
+      ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = a; ctx.fillStyle = gg; ctx.fillRect(mx - 140, my - 140, 280, 280); ctx.restore();
+    }
+    ctx.restore();
+  }
+
+  drawWonder(ctx, w, P, eg) {
+    ctx.save();
+    ctx.translate(w.x, w.y);
+    const activeGlow = w.found ? 0.4 + 0.6 * w.glow : 0.18 + 0.1 * Math.sin(this.time * 2.5 + w.x);
+
+    const gr = ctx.createRadialGradient(0, -18, 2, 0, -18, w.found ? 55 : 28);
+    gr.addColorStop(0, rgba('#ffe28a', 0.85 * activeGlow * eg));
+    gr.addColorStop(1, rgba('#ffe28a', 0));
+    ctx.fillStyle = gr;
+    ctx.fillRect(-60, -75, 120, 90);
+
+    if (w.type === 'lantern') {
+      ctx.fillStyle = '#5a4232';
+      ctx.fillRect(-3, -28, 6, 28);
+      ctx.fillRect(-9, -32, 18, 4);
+      ctx.fillStyle = w.found ? '#ffe89c' : '#a88c68';
+      ctx.fillRect(-5, -24, 10, 12);
+    } else if (w.type === 'chime') {
+      ctx.strokeStyle = '#d8b878';
+      ctx.lineWidth = 1.5;
+      for (let i = -1; i <= 1; i++) {
+        const sw = Math.sin(this.time * 3 + i) * (w.found ? 4 : 1);
+        ctx.beginPath();
+        ctx.moveTo(i * 6, -30);
+        ctx.lineTo(i * 6 + sw, -10);
+        ctx.stroke();
+      }
+    } else if (w.type === 'lotus') {
+      ctx.fillStyle = w.found ? '#ffd97d' : '#c49a6c';
+      for (let a = -2; a <= 2; a++) {
+        ctx.save();
+        ctx.translate(0, -8);
+        ctx.rotate(a * 0.35);
+        ctx.beginPath();
+        ctx.ellipse(0, -8, 4, 9, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+    } else {
+      ctx.fillStyle = '#5c4d42';
+      ctx.beginPath();
+      ctx.moveTo(-10, 0); ctx.lineTo(-6, -34); ctx.lineTo(0, -40); ctx.lineTo(6, -34); ctx.lineTo(10, 0);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = w.found ? '#ffe599' : '#8c7a6b';
+      ctx.beginPath(); ctx.arc(0, -22, 4, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  drawTwig(ctx, t) {
+    const sy = t.state === 'rest' ? GROUND_Y - this.chimneyH(t.x) : t.y;
+    const sc = t.state === 'rest' ? smooth(t.age * 1.2) : 1 + t.d * 0.2;
+    const pu = 0.7 + 0.3 * Math.sin(this.time * 4 + t.ph);
+    ctx.save(); ctx.translate(t.x, sy);
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    const gl = ctx.createRadialGradient(0, -5, 0, 0, -5, 26 * sc);
+    gl.addColorStop(0, rgba('#ffc860', 0.75 * pu)); gl.addColorStop(1, rgba('#ffc860', 0));
+    ctx.fillStyle = gl; ctx.fillRect(-30, -35, 60, 60); ctx.restore();
+    ctx.scale(sc, sc);
+    ctx.strokeStyle = '#8a6a3a'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(-12, -2); ctx.lineTo(11, -5); ctx.stroke();
+    ctx.strokeStyle = '#ffd890'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(-10, -3); ctx.lineTo(10, -6); ctx.stroke();
+    ctx.fillStyle = '#ffe7a8'; ctx.beginPath(); ctx.arc(11, -5.5, 2.6, 0, Math.PI * 2); ctx.arc(-3, -9, 2, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+
+  drawFront(ctx, g) {
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    for (const d of this.dust) {
+      const a = 1 - d.life / d.max;
+      ctx.fillStyle = d.col ? rgba(d.col, 0.85 * a) : `rgba(255,205,110,${0.8 * a})`;
+      ctx.beginPath(); ctx.arc(d.x, d.y, d.s * (0.6 + a * 0.6), 0, Math.PI * 2); ctx.fill();
+    }
+    for (const m of this.motes) {
+      const a = 1 - m.life / m.max;
+      ctx.fillStyle = `rgba(255,214,140,${0.7 * a})`; ctx.beginPath(); ctx.arc(m.x, m.y, 1.8, 0, Math.PI * 2); ctx.fill();
+    }
+    for (const h of this.hearts) {
+      const a = Math.sin((h.life / h.max) * Math.PI);
+      ctx.save();
+      ctx.translate(h.x, h.y);
+      if (h.kind === 'ring') {
+        const r = 8 + (h.life / h.max) * 55;
+        ctx.strokeStyle = `rgba(255, 224, 140, ${0.65 * a})`;
+        ctx.lineWidth = 1.8;
+        ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.stroke();
+      } else {
+        ctx.font = h.kind === 'heart' ? '14px Georgia, serif' : '15px Georgia, serif';
+        ctx.fillStyle = h.kind === 'heart' ? `rgba(255, 165, 145, ${0.95 * a})` : `rgba(255, 230, 140, ${0.95 * a})`;
+        ctx.fillText(h.kind === 'heart' ? '♥' : '♪', 0, 0);
+      }
+      ctx.restore();
+    }
+    ctx.restore();
+  }
+
+  drawOverlay(ctx, g) {
+    const { vw, vh } = g;
+    if (g.cool > 0.01 && g.grade > 0.05) { ctx.fillStyle = `rgba(50,68,96,${0.3 * g.cool * g.grade})`; ctx.fillRect(0, 0, vw, vh); }
+    const pa = g.eg * (1 - g.cool * 0.7);
+    if (pa > 0.05) {
+      ctx.fillStyle = `rgba(255,214,170,${0.55 * pa})`;
+      for (const p of this.petals) { ctx.beginPath(); ctx.ellipse(p.x, p.y, p.r * 1.6, p.r, p.ph, 0, Math.PI * 2); ctx.fill(); }
+    }
+    const n = Math.floor(this.rain.length * clamp(g.rain, 0, 1));
+    if (n > 0) {
+      ctx.strokeStyle = 'rgba(190,205,222,.34)'; ctx.lineWidth = 1; ctx.beginPath();
+      const sl = -g.windVis * 18;
+      for (let i = 0; i < n; i++) { const p = this.rain[i]; ctx.moveTo(p.x, p.y); ctx.lineTo(p.x - 4 + sl, p.y + 26); }
+      ctx.stroke();
+    }
+    if (this.squall) {
+      const s = this.squall, x0 = s.x - g.cam.x - s.w / 2;
+      const sg = ctx.createLinearGradient(x0, 0, x0 + s.w, 0);
+      sg.addColorStop(0, 'rgba(18,24,30,0)'); sg.addColorStop(0.5, 'rgba(18,24,30,.5)'); sg.addColorStop(1, 'rgba(18,24,30,0)');
+      ctx.fillStyle = sg; ctx.fillRect(x0, 0, s.w, vh);
+      ctx.strokeStyle = 'rgba(200,215,230,.45)'; ctx.beginPath();
+      for (let i = 0; i < 150; i++) {
+        const lx = x0 + ((i * 37.3 + this.time * 500) % s.w), ly = (i * 91.7 + this.time * 1300) % vh;
+        ctx.moveTo(lx, ly); ctx.lineTo(lx - 14, ly + 36);
+      }
+      ctx.stroke();
+    }
+    if (g.windVis > 0.01) {
+      ctx.lineCap = 'round'; ctx.lineWidth = 1.6;
+      for (const s of this.streaks) {
+        ctx.strokeStyle = `rgba(235,240,246,${s.a * g.windVis})`;
+        ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.lineTo(s.x + s.l, s.y + (s.y0 - s.y) * 0.3); ctx.stroke();
+      }
+    }
+    if (this.embers.length) {
+      ctx.save(); ctx.globalCompositeOperation = 'lighter';
+      for (const e of this.embers) {
+        const a = Math.min(1, (1 - e.life / e.max) * 1.6);
+        ctx.fillStyle = `rgba(255,${150 + (e.s * 30) | 0},70,${0.9 * a})`;
+        ctx.beginPath(); ctx.arc(e.x, e.y, e.s, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.restore();
+    }
+    if (g.mist > 0.01) {
+      const mg = ctx.createLinearGradient(0, 0, vw, 0);
+      mg.addColorStop(0, `rgba(170,180,192,${0.25 * g.mist})`); mg.addColorStop(1, `rgba(190,198,208,${0.8 * g.mist})`);
+      ctx.fillStyle = mg; ctx.fillRect(0, 0, vw, vh);
+    }
+  }
+}
+
+/* ============================================================================
+ * 5. POETIC NARRATIVE TEXTS (Prologue, Act 3 Heartbreak, & Finale Sentences)
+ * ========================================================================== */
+const INTRO_CINEMATIC_LINES = [
+  "Every autumn, the sky remembers a song your stubby wings cannot yet sing.",
+  "Somewhere beyond the slate and soot, someone is waiting in the warm cedar boughs.",
+  "You have only one small hop in the rain... and a heart that refuses to stay grounded."
+];
+
+const ACT3_HEARTBREAK_LINES = [
+  "\"I have you! Hold onto my wing—don't look down!\"",
+  "\"The gale is too strong... my wing is breaking...\"",
+  "\"Take my last golden feather. Hold onto my warmth...\"",
+  "\"Even if the winter takes everything else—promise me you'll grow wings to come back!\""
+];
+
+const END_POEM_SENTENCES = [
+  "You spent so long believing the rain was all you were made for.",
+  "Fighting crows on cold slate roofs. Counting the seconds on a clock that did not care if you broke.",
+  "When the gale tore you from the bough, and they pressed their last warm feather into your chest...",
+  "You could have stayed grounded. No one would have blamed a flightless bird for surrendering to the winter.",
+  "Instead, every scar in the soot became a golden feather.",
+  "You learned that love is not the absence of the headwind.",
+  "It is the reason we learn to fly straight into the storm.",
+  "Look at your wings now, little bird. The sky is finally yours."
+];
+
+/* ============================================================================
+ * 6. MAIN MODULE (Game Loop, Intro, Companion Bonding, Act 3 Sacrifice, Finale)
+ * ========================================================================== */
+const AR43 = 4 / 3, AR219 = 21 / 9, VH = 540;
+const HEADWIND_BASE = 246;
+const HEADWIND_MAX = 440;
+const CLOCK_TOTAL = 130, WIND_SHIFT_TOTAL = 68, MOLT_EVERY = 19, TWIG_BONUS = 6, CROW_BONUS = 3;
+const ACT4_MIN_X = ROOF_END - 1650;
+
+const params = new URLSearchParams(location.search);
+const DEBUG = params.get('debug') === 'true';
+
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const titleEl = document.getElementById('title');
+const beginJourneyBtn = document.getElementById('beginJourneyBtn');
+const chapterSelectBtn = document.getElementById('chapterSelectBtn');
+const controlsInfoBtn = document.getElementById('controlsInfoBtn');
+const chapterPanel = document.getElementById('chapterPanel');
+const controlsPanel = document.getElementById('controlsPanel');
+const skipIntroBtn = document.getElementById('skipIntroBtn');
+const btnAttackLabel = document.getElementById('btnAttackLabel');
+const controlsEl = document.getElementById('controls');
+const touchControlsEl = document.getElementById('touchControls');
+const touchToggleBtn = document.getElementById('touchToggleBtn');
+const muteBtn = document.getElementById('muteBtn');
+const restartBtn = document.getElementById('restartBtn');
+const poemOverlay = document.getElementById('poemOverlay');
+const poemSingleLine = document.getElementById('poemSingleLine');
+const poemActions = document.getElementById('poemActions');
+const poemSkipBtn = document.getElementById('poemSkipBtn');
+const poemRestartBtn = document.getElementById('poemRestartBtn');
+
+const audio = new AudioEngine();
+const world = new World();
+const player = new Player();
+
+const game = {
+  started: false, act: 1, actT: 0, time: 0,
+  introActive: false, introT: 0, introDur: 16.5,
+  ar: 1.78, arT: AR43, grade: 0, gradeT: 0, cool: 0, mist: 0, zoom: 1,
+  windShift: WIND_SHIFT_TOTAL, clock: CLOCK_TOTAL, clockVis: false, clockFlash: 0, clockAlpha: 1,
+  windOn: false, windForce: 0, fall: false, fallT: 0,
+  act3Stage: 'struggle',
+  act3TetherT: 0,
+  act3TearFeather: null,
+  gust: 0, gustAge: 0, gust1: false, gust2: false, ride: null,
+  twigT: 2.0, ending: false, endT: 0,
+  poemActive: false, poemIdx: -1, poemLineT: 0, freeSoarAfterPoem: false,
+  loverCutscene: null,
+  bannerText: '', bannerT: 0,
+  emotionalText: '', emotionalAlpha: 0,
+  whiteFlash: 0,
+  fade: 0, fadeState: 'none', fadeCb: null, noteT: 0, noteI: 0, lastTick: -1, windT: 0, respawning: false,
+  vw: VH * 1.78, cam: { x: 0, y: 0 }, snap: true,
+};
+
+const keys = new Set();
+const touchState = { left: false, right: false, jump: false, attack: false };
+const input = { left: false, right: false, jumpHeld: false, jumpPressed: false, attackPressed: false };
+let nudgeQueued = false;
+let touchVisible = true;
+
+function showBanner(txt, dur = 3.2) {
+  game.bannerText = txt;
+  game.bannerT = dur;
+}
+
+function beginWithNarrativeIntro() {
+  if (game.started && !titleEl.classList.contains('hidden')) {
+    titleEl.classList.add('hidden');
+  }
+  game.started = true;
+  audio.init();
+  titleEl.classList.add('hidden');
+  startAct(1);
+  game.introActive = true;
+  game.introT = 0;
+  game.arT = AR219;
+  game.ar = AR219;
+  skipIntroBtn.classList.remove('hidden');
+  audio.setMode('intro');
+}
+
+function finishNarrativeIntro() {
+  if (!game.introActive) return;
+  game.introActive = false;
+  game.arT = AR43;
+  skipIntroBtn.classList.add('hidden');
+  game.emotionalAlpha = 0;
+  audio.setMode('gray');
+  showBanner('ACT I · THE SLATE HEADWIND — Press SPACE twice to Double-Flap, J/SLASH to fend off Crows', 4.8);
+}
+
+beginJourneyBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  beginWithNarrativeIntro();
+});
+chapterSelectBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  audio.init();
+  chapterPanel.classList.toggle('hidden');
+  controlsPanel.classList.add('hidden');
+});
+controlsInfoBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  audio.init();
+  controlsPanel.classList.toggle('hidden');
+  chapterPanel.classList.add('hidden');
+});
+document.querySelectorAll('.chapter-btn').forEach((btn) => {
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const actNum = +btn.dataset.act;
+    audio.init();
+    game.started = true;
+    titleEl.classList.add('hidden');
+    if (actNum === 0) {
+      beginWithNarrativeIntro();
+    } else {
+      skipIntroBtn.classList.add('hidden');
+      game.introActive = false;
+      startAct(actNum);
+    }
+  });
+});
+skipIntroBtn.addEventListener('click', () => {
+  finishNarrativeIntro();
+  skipIntroBtn.blur();
+});
+
+addEventListener('keydown', (e) => {
+  const k = e.key.toLowerCase();
+  if ([' ', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(k)) e.preventDefault();
+  if (!game.started || !titleEl.classList.contains('hidden')) {
+    if (k === ' ' || k === 'enter') beginWithNarrativeIntro();
+    return;
+  }
+  if (game.introActive && (k === ' ' || k === 'enter' || k === 'escape')) {
+    finishNarrativeIntro();
+    return;
+  }
+  if (e.repeat) return;
+  keys.add(k);
+  if (k === 'w' || k === 'arrowup' || k === ' ') input.jumpPressed = true;
+  if (['j', 'f', 'x', 'k', 'e', 'shift'].includes(k)) {
+    input.attackPressed = true;
+    nudgeQueued = true;
+  }
+  if (k === 'm') setMuteLabel(audio.toggleMute());
+  if (k === 'r') openMainMenu();
+  if (DEBUG) {
+    if (k >= '1' && k <= '5') { game.introActive = false; skipIntroBtn.classList.add('hidden'); startAct(+k); }
+    if (k === '0') fastForward();
+  }
+});
+addEventListener('keyup', (e) => keys.delete(e.key.toLowerCase()));
+addEventListener('blur', () => {
+  keys.clear();
+  touchState.left = touchState.right = touchState.jump = touchState.attack = false;
+});
+
+canvas.addEventListener('pointerdown', () => {
+  if (game.introActive) {
+    finishNarrativeIntro();
+  } else if (game.started) {
+    audio.init();
+  }
+});
+
+muteBtn.addEventListener('click', () => { setMuteLabel(audio.toggleMute()); muteBtn.blur(); });
+restartBtn.addEventListener('click', () => { openMainMenu(); restartBtn.blur(); });
+touchToggleBtn.addEventListener('click', () => {
+  touchVisible = !touchVisible;
+  touchControlsEl.classList.toggle('hidden', !touchVisible);
+  touchToggleBtn.blur();
+});
+
+poemSkipBtn.addEventListener('click', () => {
+  game.poemActive = false;
+  game.freeSoarAfterPoem = true;
+  poemOverlay.classList.remove('active');
+  poemActions.classList.remove('visible');
+  showBanner('Soar freely together across the Eternal Mountain', 4.5);
+});
+poemRestartBtn.addEventListener('click', () => {
+  poemOverlay.classList.remove('active');
+  poemActions.classList.remove('visible');
+  openMainMenu();
+});
+
+function setMuteLabel(m) { muteBtn.textContent = m ? 'sound off' : 'sound on'; }
+
+function openMainMenu() {
+  audio.stopFinale();
+  poemOverlay.classList.remove('active');
+  poemActions.classList.remove('visible');
+  skipIntroBtn.classList.add('hidden');
+  game.introActive = false;
+  titleEl.classList.remove('hidden');
+  controlsEl.classList.remove('hide');
+}
+
+function bindTouchBtn(id, prop, onPress) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const start = (e) => {
+    e.preventDefault();
+    if (!game.started) beginWithNarrativeIntro();
+    else audio.init();
+    touchState[prop] = true;
+    el.classList.add('active');
+    if (onPress) onPress();
+  };
+  const end = (e) => {
+    e.preventDefault();
+    touchState[prop] = false;
+    el.classList.remove('active');
+  };
+  el.addEventListener('pointerdown', start);
+  el.addEventListener('pointerup', end);
+  el.addEventListener('pointercancel', end);
+  el.addEventListener('pointerleave', end);
+}
+
+bindTouchBtn('btnLeft', 'left');
+bindTouchBtn('btnRight', 'right');
+bindTouchBtn('btnJump', 'jump', () => { input.jumpPressed = true; });
+bindTouchBtn('btnAttack', 'attack', () => { input.attackPressed = true; nudgeQueued = true; });
+
+function readInput() {
+  if (game.loverCutscene || game.introActive || (game.act === 3 && game.act3Stage === 'tether')) {
+    input.left = false; input.right = false; input.jumpHeld = false;
+    input.jumpPressed = false; input.attackPressed = false;
+    return;
+  }
+  input.left = keys.has('a') || keys.has('arrowleft') || touchState.left;
+  input.right = keys.has('d') || keys.has('arrowright') || touchState.right;
+  input.jumpHeld = keys.has('w') || keys.has('arrowup') || keys.has(' ') || touchState.jump;
+}
+
+let W = 0, H = 0, dpr = 1;
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 3);
+  W = window.innerWidth; H = window.innerHeight;
+  canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
+}
+addEventListener('resize', resize);
+resize();
+
+const fmt = (s) => { s = Math.max(0, Math.ceil(s)); return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0'); };
+const gradeX = (x) => smooth((x - 4250) / 600);
+
+function doFade(cb) {
+  if (game.fadeState !== 'none') return false;
+  game.fadeState = 'out'; game.fadeCb = cb;
+  return true;
+}
+
+function fastForward() {
+  if (game.act === 2) game.windShift = Math.min(game.windShift, 3);
+  else if (game.act === 4) game.clock = Math.min(game.clock, 3);
+  else if (game.act === 1) { player.x = ROOF_END - 200; }
+}
+
+function startAct(n, o = {}) {
+  const nat = !!o.natural;
+  game.act = n; game.actT = 0; game.ride = null; game.fall = false; game.fallT = 0;
+  game.loverCutscene = null;
+  game.poemActive = false;
+  game.poemIdx = -1;
+  game.poemLineT = 0;
+  game.freeSoarAfterPoem = false;
+  game.emotionalAlpha = 0;
+  game.act3Stage = 'struggle';
+  game.act3TetherT = 0;
+  game.act3TearFeather = null;
+  world.comp.act3Pos = null;
+  poemOverlay.classList.remove('active');
+  poemActions.classList.remove('visible');
+  poemSingleLine.classList.remove('visible');
+  const snapView = () => { if (!nat) { game.grade = game.gradeT; game.ar = game.arT; game.snap = true; } };
+  if (n !== 5) { game.ending = false; game.endT = 0; audio.stopFinale(); }
+
+  switch (n) {
+    case 1:
+      player.reset(110, GROUND_Y); player.featherStage = 0;
+      Object.assign(game, { arT: AR43, gradeT: 0, cool: 0, mist: 0, zoom: 1, windOn: false, clockVis: false, clockAlpha: 1, gust: 0, gust1: false, gust2: false, windShift: WIND_SHIFT_TOTAL, clock: CLOCK_TOTAL });
+      world.reset();
+      snapView(); if (!nat) { game.grade = 0; game.cool = 0; }
+      break;
+    case 2:
+      if (!nat) player.reset(4780, 410);
+      player.vy = 0; player.featherStage = 0; player.hp = player.maxHp;
+      Object.assign(game, { arT: AR219, gradeT: 1, cool: 0, mist: 0, zoom: 1, windOn: false, clockVis: false, gust: 0, windShift: WIND_SHIFT_TOTAL });
+      showBanner('ACT II · THE GOLDEN MOUNTAIN — Explore the Sacred Wonders & Climb to the Summit', 4.5);
+      snapView();
+      break;
+    case 3:
+      if (!nat) { player.reset(5550, 120); player.featherStage = 0; }
+      world.comp.revealed = true;
+      world.comp.revealProgress = 1;
+      world.comp.act3Pos = { x: COMPANION.x, y: COMPANION.y, spread: 0.9 };
+      Object.assign(game, { arT: AR219, gradeT: 1, cool: 1, mist: 0, zoom: 1, windOn: true, windT: 0, clockVis: false, gust: 0, windShift: 0 });
+      game.whiteFlash = 1; audio.bell();
+      showBanner('ACT III · THE CRUEL GALE — Your Companion Flies into the Blizzard to Reach You!', 4.2);
+      snapView();
+      break;
+    case 4:
+      player.reset(ROOF_END - 1100, GROUND_Y); player.featherStage = 0; player.hp = 68;
+      Object.assign(game, { arT: AR43, gradeT: 0, cool: 0, mist: 0, zoom: 1, windOn: false, clockVis: true, clockAlpha: 1, clock: CLOCK_TOTAL, gust: 0, gustAge: 0, gust1: false, gust2: false, twigT: 1.5, lastTick: -1 });
+      game.grade = 0; game.ar = AR43; game.snap = true;
+      world.reset();
+      world.keepsakeFeather = { x: player.x + 48, y: GROUND_Y, age: 0, collected: false };
+      world.spawnCrow(player.x + 280, GROUND_Y - 140, true);
+      world.spawnCrow(player.x - 240, GROUND_Y - 165, true);
+      world.spawnTwig(player.x + 190);
+      showBanner('ACT IV · WINTER ENDURANCE — Hold onto Their Feather, Fend off Crows & Launch Twigs East', 5.2);
+      break;
+    case 5:
+      player.featherStage = 6; player.molt = 1; player.hp = player.maxHp;
+      if (!nat) player.reset(ROOF_END - 600, GROUND_Y);
+      player.featherStage = 6;
+      world.comp.revealed = true;
+      world.comp.revealProgress = 1;
+      Object.assign(game, { arT: AR43, gradeT: 0, cool: 0, mist: 0, zoom: 1, windOn: false, clockVis: false, gust: 0, ending: false, endT: 0 });
+      game.ar = nat ? game.ar : AR43; game.grade = nat ? game.grade : 0; game.snap = !nat;
+      if (!nat) {
+        world.reset();
+        world.comp.revealed = true;
+        world.comp.revealProgress = 1;
+      }
+      world.crows.length = 0;
+      world.spawnEmbers(game.vw / 2, 150);
+      audio.featherChime();
+      showBanner('ACT V · FULL PLUMAGE — Hold SPACE to Soar Back to Your Companion at the Summit!', 5.0);
+      break;
+  }
+  if (n !== 5) controlsEl.classList.remove('hide');
+}
+
+function envFor() {
+  const a = game.act, st = player.featherStage;
+  if (a === 2 || a === 3) {
+    return {
+      isMundane: false,
+      g: 1060, jump: 530, max: PLAYER_MAX_MOVE, accel: 1150,
+      flutter: 95, flap: 215, wind: a === 3 ? game.windForce : 0,
+    };
+  }
+  if (a === 4) {
+    const gustRide = game.gust > 0 && player.x > ROOF_END - 110 && player.x < 5700;
+    return {
+      isMundane: !gustRide,
+      airFlaps: 1,
+      doubleFlapVy: 415,
+      g: 1680, jump: 465, max: 198, accel: 1350,
+      glide: st >= 3 ? 240 : 0,
+      slow: world.squallHit(player.x) ? 0.58 : 1,
+      gust: gustRide, minX: ACT4_MIN_X,
+    };
+  }
+  if (a === 5) {
+    const open = game.actT > 1.8;
+    return {
+      isMundane: false,
+      g: 980, jump: open ? 530 : 450, max: open ? 275 : 220, accel: 1250,
+      soar: open,
+    };
+  }
+  return {
+    isMundane: true,
+    airFlaps: 1,
+    doubleFlapVy: 410,
+    g: 1820, jump: 455, max: 168, accel: 1450,
+  };
+}
+
+function triggerLoverSurpriseCutscene() {
+  world.comp.revealed = true;
+  game.loverCutscene = { t: 0, dur: 4.5 };
+  world.addDust(COMPANION.x, COMPANION.y - 16, 45, 3.0, '#ffe28a');
+  world.addHeartOrNote((player.x + COMPANION.x) / 2, COMPANION.y - 28, 'heart');
+  audio.loverRevealCue();
+  showBanner('The Golden Blossom Veil Parts — Press [E / ♥ BOND] to Sing & Build a Nest Together!', 4.8);
+}
+
+function triggerCompanionBondInteraction() {
+  const c = world.comp;
+  const kind = c.bondLevel % 4;
+  c.bondLevel++;
+  c.bondAnim = { type: ['nuzzle', 'duet', 'nest', 'dance'][kind], t: 0, dur: 2.2 };
+  audio.bondCue(kind);
+
+  const mx = (player.x + COMPANION.x) / 2;
+  const my = COMPANION.y - 22;
+
+  if (kind === 0) {
+    for (let i = 0; i < 6; i++) world.addHeartOrNote(mx, my, 'heart');
+    world.addDust(mx, my, 18, 1.5, '#ffd890');
+    showBanner('♥ You nuzzle and preen each other\'s feathers in the warm mountain breeze.', 3.4);
+  } else if (kind === 1) {
+    for (let i = 0; i < 6; i++) world.addHeartOrNote(mx, my - 6, 'note');
+    world.addHeartOrNote(mx, my - 8, 'ring');
+    showBanner('♪ You sing a harmonic mountain duet together! The ancient pine resonates.', 3.4);
+  } else if (kind === 2) {
+    c.nestProgress = Math.min(1, c.nestProgress + 0.5);
+    player.hasCrest = true;
+    world.addDust(COMPANION.x - 14, COMPANION.y - 6, 30, 2.0, '#ffe28a');
+    for (let i = 0; i < 5; i++) world.addHeartOrNote(mx, my, 'heart');
+    showBanner('♥ Together you weave golden twigs into a warm Sun-Nest! (+Golden Crest)', 3.8);
+  } else {
+    c.nestProgress = 1;
+    player.vy = -210;
+    for (let i = 0; i < 5; i++) {
+      world.addHeartOrNote(mx, my, i % 2 ? 'heart' : 'note');
+    }
+    showBanner('♥ Joyful Wing-Dance! Your bond is unbreakable.', 3.4);
+  }
+
+  if (game.act === 2) {
+    game.windShift = Math.min(WIND_SHIFT_TOTAL, game.windShift + 3.0);
+  }
+}
+
+function updateIntroCinematic(dt) {
+  game.introT += dt;
+  const t = game.introT;
+  const u = clamp(t / game.introDur, 0, 1);
+
+  const camStart = 1150;
+  const camEnd = 0;
+  game.cam.x = lerp(camStart, camEnd, smooth(u));
+  game.cam.y = lerp(-120, 0, smooth(u));
+  game.zoom = lerp(1.18, 1.0, smooth(u));
+
+  player.facing = 1;
+  player.lean = Math.sin(t * 18) * 0.03 * (1 - u * 0.5);
+  if (t > 11.2 && t < 11.35 && player.onGround) {
+    player.vy = -260;
+    player.vx = 55;
+    audio.jump(false);
+  }
+
+  const segDur = game.introDur / INTRO_CINEMATIC_LINES.length;
+  const idx = Math.min(INTRO_CINEMATIC_LINES.length - 1, Math.floor(t / segDur));
+  const localT = (t - idx * segDur) / segDur;
+  game.emotionalText = INTRO_CINEMATIC_LINES[idx];
+  game.emotionalAlpha = localT < 0.22
+    ? smooth(localT / 0.22)
+    : localT > 0.78
+      ? smooth((1 - localT) / 0.22)
+      : 1;
+
+  if (t >= game.introDur) {
+    finishNarrativeIntro();
+  }
+}
+
+function update(dt) {
+  game.time += dt; game.actT += dt;
+  game.bannerT = Math.max(0, game.bannerT - dt);
+
+  if (game.introActive) {
+    updateIntroCinematic(dt);
+  }
+
+  if (game.fadeState === 'out') {
+    game.fade += dt / 0.45;
+    if (game.fade >= 1) {
+      game.fade = 1;
+      const cb = game.fadeCb; game.fadeCb = null;
+      if (cb) cb();
+      game.fadeState = 'in';
+    }
+  } else if (game.fadeState === 'in') {
+    game.fade -= dt / 0.6;
+    if (game.fade <= 0) { game.fade = 0; game.fadeState = 'none'; }
+  }
+  game.whiteFlash = Math.max(0, game.whiteFlash - dt * 0.9);
+  game.clockFlash = Math.max(0, game.clockFlash - dt * 1.4);
+
+  const a = game.act;
+  let ridden = false;
+  if (a === 1 && game.ride) { updateRide(dt); ridden = true; }
+
+  const nearCompanionForBond =
+    (a === 2 || a === 5) &&
+    world.comp.revealed &&
+    !game.loverCutscene &&
+    !game.ending &&
+    Math.hypot(player.x - COMPANION.x, player.y - COMPANION.y) < 95;
+
+  if (btnAttackLabel) {
+    btnAttackLabel.textContent = nearCompanionForBond ? '♥ BOND' : 'SLASH';
+  }
+
+  if (game.loverCutscene) {
+    game.loverCutscene.t += dt;
+    const u = clamp(game.loverCutscene.t / game.loverCutscene.dur, 0, 1);
+    player.vx = 0;
+    player.facing = COMPANION.x >= player.x ? 1 : -1;
+    if (Math.random() < dt * 25) {
+      world.addDust((player.x + COMPANION.x) / 2, COMPANION.y - 18, 2, 2.2, '#ffe596');
+    }
+    if (u >= 1) {
+      game.loverCutscene = null;
+      if (a === 2 && game.windShift > 14) {
+        game.windShift = Math.min(game.windShift, 18);
+      }
+    }
+  }
+
+  if (nearCompanionForBond && input.attackPressed) {
+    input.attackPressed = false;
+    nudgeQueued = false;
+    triggerCompanionBondInteraction();
+  }
+
+  const env = envFor();
+  if (!ridden && !(a === 3 && game.act3Stage === 'tether')) {
+    const solids = world.solids(a, game.gust, game.fall);
+    player.update(dt, input, env, solids);
+  } else {
+    player.animate(dt, 0, null, input);
+  }
+  input.jumpPressed = false;
+  input.attackPressed = false;
+
+  if (world.comp.bondAnim) {
+    const ba = world.comp.bondAnim;
+    if (ba.type === 'nuzzle') {
+      player.x = lerp(player.x, COMPANION.x - 16, dt * 6);
+      player.facing = 1;
+      player.extraLean = 0.24;
+      world.comp.lean = -0.24;
+    } else if (ba.type === 'dance') {
+      player.bob = -Math.abs(Math.sin(game.time * 12)) * 10;
+    } else {
+      player.bob = 0;
+    }
+  } else {
+    player.bob = 0;
+  }
+
+  for (const ev of player.events) {
+    if (ev === 'jump') audio.jump(game.grade > 0.5);
+    else if (ev === 'doubleFlap') {
+      audio.doubleFlap();
+      world.addDust(player.x, player.y - 4, 9, 1.1, '#d8e6f5');
+    } else if (ev === 'flap') audio.jump(true);
+    else if (ev === 'slash') audio.slash();
+    else if (ev === 'hurt') audio.hurt();
+  }
+  player.events.length = 0;
+  player.showOff = a === 5 && game.actT > 0.8 && game.actT < 3.6;
+
+  if (a === 1) {
+    if (!game.ride && player.x > ROOF_END - 30) {
+      game.ride = { t: 0, dur: 4.2, x0: player.x, y0: player.y };
+      world.crows.length = 0;
+      audio.gustCue();
+    }
+  } else if (a === 2) {
+    if (!game.loverCutscene) {
+      game.windShift -= dt;
+    }
+    const ci = Math.ceil(game.windShift);
+    if (ci !== game.lastTick) {
+      game.lastTick = ci;
+      if (game.windShift <= 10 && ci > 0) audio.tick(true);
+      else if (ci > 0 && ci % 5 === 0) audio.tick(false);
+    }
+    game.cool = clamp((10 - game.windShift) / 10, 0, 1);
+
+    const distToLover = Math.hypot(player.x - COMPANION.x, player.y - COMPANION.y);
+    if (!world.comp.revealed && distToLover < 145 && player.y <= 155) {
+      triggerLoverSurpriseCutscene();
+    }
+
+    if (game.windShift <= 0 && !game.loverCutscene) {
+      game.windShift = 0;
+      startAct(3, { natural: true });
+    }
+    if (player.y > 720 && !game.respawning) {
+      game.respawning = true;
+      if (!doFade(() => { player.reset(4780, 410); game.respawning = false; })) game.respawning = false;
+    }
+  } else if (a === 3) {
+    updateAct3(dt);
+  } else if (a === 4) {
+    updateAct4(dt);
+  } else if (a === 5) {
+    updateAct5(dt);
+  }
+
+  if (game.grade > 0.5 && (!player.onGround || Math.abs(player.vx) > 30) && Math.random() < dt * 40) {
+    world.addDust(player.x - player.facing * 8, player.y - 8, 1);
+  }
+  if (player.molt > 0.95) world.addDust(player.x, player.y - 14, 14, 2);
+
+  updateCompanion(dt);
+  if (!game.introActive) updateCamera(dt);
+  updateGrade(dt);
+  buildG();
+  world.update(dt, G, player);
+  handleWorldEvents();
+
+  const rain = clamp(1 - game.grade * 1.15, 0, 1) * (game.act === 3 ? 0.7 : 1);
+  const wind = a === 3 ? clamp(game.windT / 2, 0, 1) : G.windVis;
+  audio.update(dt, { grade: game.grade * (1 - 0.7 * game.cool), rain, wind: Math.max(wind, game.cool * 0.15), rumble: a === 2 ? game.cool : a === 3 ? 1 : 0 });
+  if (game.introActive) audio.setMode('intro');
+  else if (a === 3) audio.setMode(game.act3Stage === 'tether' || game.act3Stage === 'fall' ? 'tragic' : 'none');
+  else if (a === 2) audio.setMode(game.cool > 0.6 ? 'none' : 'warm');
+  else if (a === 5) audio.setMode(game.ending ? 'finale_calm' : game.grade > 0.5 ? 'warm' : 'gray');
+  else if (a === 4) audio.setMode(game.grade > 0.5 ? 'warm' : 'gray');
+  else audio.setMode('gray');
+}
+
+function updateRide(dt) {
+  const r = game.ride; r.t += dt;
+  const u = clamp(r.t / r.dur, 0, 1), e = smooth(u);
+  player.x = lerp(r.x0, 4790, e);
+  player.y = lerp(r.y0, 405, e) - Math.sin(Math.PI * u) * 300;
+  player.vx = 120; player.vy = 0; player.facing = 1; player.onGround = false;
+  game.arT = AR219;
+  game.gradeT = smooth((u - 0.05) / 0.85); game.grade = game.gradeT;
+  if (u > 0.2 && Math.random() < dt * 50) world.addDust(player.x - 8, player.y - 8, 1);
+  if (u >= 1) { player.vy = 0; startAct(2, { natural: true }); }
+}
+
+function updateAct3(dt) {
+  game.windT += dt;
+  const t = game.actT;
+
+  if (game.act3Stage === 'struggle') {
+    game.windForce = Math.min(HEADWIND_MAX, HEADWIND_BASE + (HEADWIND_MAX - HEADWIND_BASE) * (t / 14)) * clamp(t / 0.5, 0, 1);
+    if (t > 12) game.windForce += (t - 12) * 35;
+    game.mist = clamp(t / 18, 0, 0.65);
+
+    if (world.comp.act3Pos) {
+      const targetX = player.x + 36;
+      const targetY = player.y - 22 + Math.sin(t * 7) * 6;
+      world.comp.act3Pos.x = lerp(world.comp.act3Pos.x, targetX, dt * 3.5);
+      world.comp.act3Pos.y = lerp(world.comp.act3Pos.y, targetY, dt * 3.5);
+      world.comp.facing = -1;
+      world.comp.lean = -0.35;
+    }
+
+    if (player.x < 4690 || player.y > 445 || t > 11.5) {
+      game.act3Stage = 'tether';
+      game.act3TetherT = 0;
+      player.vx = 0;
+      player.vy = 0;
+      audio.sacrificeCry();
+    }
+  } else if (game.act3Stage === 'tether') {
+    game.act3TetherT += dt;
+    const tt = game.act3TetherT;
+    const dur = 11.2;
+
+    player.x = lerp(player.x, 4640, dt * 3);
+    player.y = lerp(player.y, 380 + Math.sin(tt * 4) * 3, dt * 3);
+    player.facing = 1;
+    player.spread = 0.9;
+
+    if (world.comp.act3Pos) {
+      world.comp.act3Pos.x = player.x + 22;
+      world.comp.act3Pos.y = player.y - 8;
+      world.comp.facing = -1;
+      world.comp.lean = -0.28;
+    }
+
+    const seg = dur / ACT3_HEARTBREAK_LINES.length;
+    const idx = Math.min(ACT3_HEARTBREAK_LINES.length - 1, Math.floor(tt / seg));
+    const localU = (tt - idx * seg) / seg;
+    game.emotionalText = ACT3_HEARTBREAK_LINES[idx];
+    game.emotionalAlpha = localU < 0.2 ? smooth(localU / 0.2) : localU > 0.8 ? smooth((1 - localU) / 0.2) : 1;
+
+    if (tt > seg * 2 && !game.act3TearFeather) {
+      game.act3TearFeather = { x: player.x + 20, y: player.y - 14 };
+      world.addDust(player.x + 10, player.y - 12, 35, 2.2, '#ffd978');
+      audio.featherChime();
+    }
+    if (game.act3TearFeather) {
+      game.act3TearFeather.x = lerp(game.act3TearFeather.x, player.x + 4, dt * 4);
+      game.act3TearFeather.y = lerp(game.act3TearFeather.y, player.y - 10, dt * 4);
+    }
+
+    if (tt >= dur) {
+      game.act3Stage = 'fall';
+      game.fall = true;
+      game.fallT = 0;
+      game.emotionalAlpha = 0;
+      game.whiteFlash = 0.85;
+      audio.sacrificeCry();
+    }
+  } else if (game.act3Stage === 'fall') {
+    game.fallT += dt;
+    player.x -= 140 * dt;
+    player.y += 260 * dt;
+    if (world.comp.act3Pos) {
+      world.comp.act3Pos.x += 220 * dt;
+      world.comp.act3Pos.y -= 190 * dt;
+    }
+    if (game.act3TearFeather) {
+      game.act3TearFeather.x = player.x + 6;
+      game.act3TearFeather.y = player.y - 12;
+    }
+    game.arT = AR43;
+    game.gradeT = 0;
+    game.mist = Math.min(1, game.mist + dt * 0.45);
+    if (game.fallT > 3.0) {
+      doFade(() => startAct(4, { natural: true }));
+    }
+  }
+}
+
+function updateAct4(dt) {
+  game.clock -= dt;
+  const ci = Math.ceil(game.clock);
+  if (ci !== game.lastTick) { game.lastTick = ci; if (ci > 0) audio.tock(); }
+  game.gust = Math.max(0, game.gust - dt); game.gustAge += dt;
+
+  const elapsed = CLOCK_TOTAL - game.clock;
+  const want = Math.min(6, Math.floor(elapsed / MOLT_EVERY));
+  if (want > player.featherStage) {
+    player.featherStage = want;
+    player.molt = 1;
+    player.heal(18);
+    audio.featherChime();
+    world.addDust(player.x, player.y - 14, 22, 2.2);
+    showBanner(`Golden Feather ${want} / 6 Grown — Your Wings Grow Stronger!`, 3.2);
+  }
+
+  game.twigT -= dt;
+  if (game.twigT <= 0 && world.restingTwigs() < 3) {
+    world.spawnTwig(clamp(player.x + 180 + Math.random() * 360, ACT4_MIN_X + 180, ROOF_END - 220));
+    game.twigT = 5.5 + Math.random() * 3.5;
+  } else if (game.twigT <= 0) game.twigT = 1.8;
+
+  if (nudgeQueued) { nudgeQueued = false; world.nudge(player); }
+
+  if (!game.gust1 && game.clock <= 82) { game.gust1 = true; startGust(); }
+  if (!game.gust2 && game.clock <= 38) { game.gust2 = true; startGust(); }
+
+  game.clockAlpha = 1;
+  if (game.respawning === false && player.y > 700) {
+    game.respawning = true;
+    if (!doFade(() => { player.reset(ROOF_END - 450, GROUND_Y); player.featherStage = want; game.respawning = false; })) game.respawning = false;
+  }
+  if (game.clock <= 0) {
+    game.clock = 0; game.gust = 0;
+    game.clockVis = false;
+    audio.bell();
+    if (player.x > ROOF_END - 20 || player.y < GROUND_Y - 60) player.reset(ROOF_END - 600, GROUND_Y);
+    startAct(5, { natural: true });
+  }
+}
+function startGust() { game.gust = 8; game.gustAge = 0; audio.gustCue(); }
+
+function updateAct5(dt) {
+  const distToLover = Math.hypot(player.x - COMPANION.x, player.y - COMPANION.y);
+  if (!world.comp.revealed && distToLover < 155 && player.y <= 155) {
+    triggerLoverSurpriseCutscene();
+  }
+
+  if (!game.ending) {
+    const onTop = player.onGround && Math.abs(player.y - COMPANION.y) < 8 && Math.abs(player.x - COMPANION.x) < 120;
+    game.endT = onTop ? game.endT + dt : Math.max(0, game.endT - dt);
+    if (game.endT > 1.8 && !game.loverCutscene) {
+      game.ending = true;
+      game.poemActive = true;
+      game.poemIdx = -1;
+      game.poemLineT = 0;
+      poemOverlay.classList.add('active');
+      poemActions.classList.remove('visible');
+      audio.startFinale();
+    }
+  } else if (game.poemActive && !game.freeSoarAfterPoem) {
+    game.poemLineT += dt;
+    const SENTENCE_DUR = 6.2;
+
+    if (game.poemIdx === -1) {
+      if (game.poemLineT >= 2.2) {
+        game.poemIdx = 0;
+        game.poemLineT = 0;
+        poemSingleLine.textContent = END_POEM_SENTENCES[0];
+        poemSingleLine.classList.add('visible');
+      }
+    } else if (game.poemIdx < END_POEM_SENTENCES.length) {
+      if (game.poemLineT >= SENTENCE_DUR - 1.6 && poemSingleLine.classList.contains('visible')) {
+        poemSingleLine.classList.remove('visible');
+      }
+      if (game.poemLineT >= SENTENCE_DUR) {
+        game.poemIdx++;
+        game.poemLineT = 0;
+        if (game.poemIdx < END_POEM_SENTENCES.length) {
+          poemSingleLine.textContent = END_POEM_SENTENCES[game.poemIdx];
+          poemSingleLine.classList.add('visible');
+        } else {
+          poemActions.classList.add('visible');
+        }
+      }
+    }
+
+    player.x = lerp(player.x, COMPANION.x - 16, dt * 2.5);
+    player.y = lerp(player.y, COMPANION.y, dt * 3);
+    player.facing = 1;
+    player.spread = 0.35 + Math.sin(game.time * 1.6) * 0.08;
+    world.comp.facing = -1;
+    if (Math.random() < dt * 12) {
+      world.addDust((player.x + COMPANION.x) / 2, COMPANION.y - 16, 1, 2.0, '#ffe89e');
+    }
+  }
+
+  if (game.actT > 6) controlsEl.classList.add('hide');
+  game.gradeT = game.ending ? 1 : gradeX(player.x);
+  game.arT = game.ending || player.x > 4300 ? AR219 : AR43;
+  if (player.y > 720 && !game.respawning) {
+    game.respawning = true;
+    if (!doFade(() => { player.reset(ROOF_END - 500, GROUND_Y); player.featherStage = 6; game.respawning = false; })) game.respawning = false;
+  }
+  player.y = Math.max(player.y, -400);
+}
+
+function updateCompanion(dt) {
+  const c = world.comp, visible = game.grade > 0.5 && game.act !== 3;
+  const dx = COMPANION.x - player.x, dy = COMPANION.y - player.y;
+  const d = Math.hypot(dx, dy * 0.8);
+  const near = visible ? smooth(1 - d / 210) : 0;
+  c.near += (near - c.near) * (1 - Math.exp(-dt * 4));
+  if (!c.bondAnim && game.act !== 3) {
+    c.facing = c.near > 0.08 ? (dx > 0 ? -1 : 1) : -1;
+    c.lean += (c.near * 0.14 * c.facing - c.lean) * (1 - Math.exp(-dt * 5));
+    player.extraLean = near * 0.14 * (dx > 0 ? 1 : -1);
+  }
+  if (near > 0.3 && !input.left && !input.right) player.facing = dx > 0 ? 1 : -1;
+  game.noteT -= dt;
+  if (c.near > 0.3 && c.revealed && game.noteT <= 0 && !game.poemActive) {
+    audio.noteNear(game.noteI++);
+    game.noteT = 1.15 - 0.5 * c.near;
+  }
+}
+
+function updateCamera(dt) {
+  const a = game.act, vw = VH * game.ar;
+  game.vw = vw;
+  let lead = a === 1 ? 0.4 : 0.5;
+  let focusX = player.x;
+  let focusY = player.y;
+
+  if (a === 3 && (game.act3Stage === 'tether' || game.act3Stage === 'fall')) {
+    const cx = world.comp.act3Pos ? world.comp.act3Pos.x : player.x;
+    const cy = world.comp.act3Pos ? world.comp.act3Pos.y : player.y;
+    focusX = (player.x + cx) / 2;
+    focusY = (player.y + cy) / 2;
+    game.zoom = lerp(game.zoom, game.act3Stage === 'tether' ? 1.28 : 0.92, dt * 3);
+  } else if (game.loverCutscene || (game.ending && game.poemActive)) {
+    focusX = (player.x + COMPANION.x) / 2;
+    focusY = (player.y + COMPANION.y) / 2;
+    game.zoom = lerp(game.zoom, 1.18, dt * 3);
+  } else if (a !== 3) {
+    game.zoom = lerp(game.zoom, 1.0, dt * 3);
+  }
+
+  let tx = focusX - vw * lead;
+  const maxX = a === 3 ? 6200 : 6150 - vw;
+  tx = clamp(tx, 0, Math.max(0, maxX));
+  if (a === 2) tx = clamp(tx, 4380, Math.max(4380, 6150 - vw));
+  let ty = 0;
+  if (focusY < 300) ty = focusY - 300;
+  else if (focusY > 470) ty = focusY - 470;
+  ty = clamp(ty, -320, 420);
+
+  const k = game.snap ? 1 : 1 - Math.exp(-dt * 5);
+  game.cam.x += (tx - game.cam.x) * k;
+  game.cam.y += (ty - game.cam.y) * k;
+  game.snap = false;
+}
+
+function updateGrade(dt) {
+  const a = game.act;
+  if (a === 4) {
+    game.gradeT = game.gust > 0 ? gradeX(player.x) : 0;
+    game.arT = game.gust > 0 && player.x > 4300 ? AR219 : AR43;
+  }
+  if (!(a === 1 && game.ride)) {
+    const rate = a === 3 ? 1.4 : a === 4 ? (game.gust > 0 ? 3 : 1.6) : 2.5;
+    game.grade += (game.gradeT - game.grade) * (1 - Math.exp(-dt * rate));
+  }
+  game.ar += (game.arT - game.ar) * (1 - Math.exp(-dt * (a === 1 && !game.ride ? 1.5 : 2.2)));
+}
+
+function handleWorldEvents() {
+  for (const ev of world.events) {
+    if (ev.type === 'twigLaunch') audio.twigChime();
+    else if (ev.type === 'nudge') audio.pluck(520, 0.4);
+    else if (ev.type === 'twigArrive') {
+      game.clock = Math.max(0, game.clock - TWIG_BONUS);
+      game.clockFlash = 1;
+      audio.pluck(1318, 0.5);
+      audio.pluck(1760, 0.35, 0.12);
+      showBanner(`Twig Offered to the Horizon (-${TWIG_BONUS}s on the Clock!)`, 2.6);
+    } else if (ev.type === 'crowCaw') {
+      audio.crowCaw();
+    } else if (ev.type === 'crowHit') {
+      audio.crowHit();
+    } else if (ev.type === 'crowDefeated') {
+      audio.featherChime();
+      if (game.act === 4) {
+        game.clock = Math.max(0, game.clock - CROW_BONUS);
+        game.clockFlash = 0.8;
+        showBanner(`Crow Vanquished! (-${CROW_BONUS}s Clock & Golden Ember Dropped)`, 2.5);
+      }
+    } else if (ev.type === 'emberPickup') {
+      audio.healPickup();
+    } else if (ev.type === 'keepsakePicked') {
+      audio.featherChime();
+      showBanner('You clutch their warm golden feather to your chest. (+Full Resolve)', 4.2);
+    } else if (ev.type === 'wonderFound') {
+      audio.wonderChime();
+      const foundCount = world.wonders.filter((w) => w.found).length;
+      if (game.act === 2) {
+        game.windShift += 6;
+      }
+      player.vy = Math.min(player.vy, -280);
+      showBanner(`Discovered ${ev.wonder.name} (${foundCount}/${world.wonders.length})!`, 3.6);
+    }
+  }
+  world.events.length = 0;
+}
+
+const G = {
+  vw: 720, vh: VH, cam: game.cam, zoom: 1, grade: 0, eg: 0, cool: 0, act: 1, mist: 0, rain: 1, windVis: 0, parting: false,
+  px: 0, py: 0, clock: { vis: false, text: '', flash: 0, crack: 0, pulse: 0, alpha: 1, shake: false },
+  gustI: 0, player, x0: 0, x1: 0, minX: 0, ride: null, ending: false, loverCutscene: null, introActive: false,
+};
+
+function buildG() {
+  const a = game.act;
+  G.vw = VH * game.ar; G.act = a; G.zoom = game.zoom;
+  G.grade = game.grade; G.cool = game.cool; G.eg = game.grade * (1 - 0.85 * game.cool); G.mist = game.mist;
+  G.rain = clamp(1 - game.grade * 1.15, 0, 1) * (a === 3 ? 0.7 : 1);
+  if (a === 3) G.windVis = smooth(game.windT / 1.5) * (game.fall ? clamp(1 - game.fallT / 2.8, 0.3, 1) : 1);
+  else if (a === 5) G.windVis = smooth((GROUND_Y - player.y) / 160) * smooth((player.x - 3900) / 500) * (game.ending ? 0.5 : 1);
+  else G.windVis = 0;
+  G.parting = a === 5;
+  const z = game.zoom;
+  G.px = (player.x - game.cam.x - G.vw / 2) * z + G.vw / 2;
+  G.py = (player.y - 12 - game.cam.y - VH / 2) * z + VH / 2;
+  const c = G.clock;
+  c.vis = game.clockVis; c.text = fmt(game.clock); c.flash = game.clockFlash;
+  c.crack = game.clock < 3 ? clamp(1 - game.clock / 3, 0, 1) : 0; c.shake = c.crack > 0;
+  c.pulse = game.clock <= 10 ? Math.max(0, 1 - (game.clock % 1) * 3) : 0; c.alpha = 1;
+  const ge = game.gust > 0 ? Math.min(1, game.gustAge * 2, game.gust * 2) : 0;
+  G.gustI = ge;
+  const span = G.vw / z + 200;
+  G.x0 = game.cam.x - span; G.x1 = game.cam.x + span * 2;
+  G.minX = game.act === 4 ? ACT4_MIN_X : 0;
+  G.ride = game.ride;
+  G.ending = game.ending;
+  G.loverCutscene = game.loverCutscene;
+  G.introActive = game.introActive;
+}
+
+function drawHud(vw) {
+  const a = game.act;
+
+  // 1. Mundane Survival HUD (Health Bar, Double-Flap Pip, Feather Stage)
+  if (((a === 1 && !game.ride && !game.introActive) || (a === 4 && game.gust <= 0)) && game.started) {
+    ctx.save();
+    const x = 20, y = 18, bw = 136, bh = 10;
+    ctx.fillStyle = 'rgba(10, 14, 18, 0.72)';
+    ctx.fillRect(x - 4, y - 4, bw + 8, bh + 28);
+    ctx.strokeStyle = 'rgba(180, 195, 210, 0.35)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x - 4, y - 4, bw + 8, bh + 28);
+
+    const hpRatio = clamp(player.hp / player.maxHp, 0, 1);
+    const barCol = hpRatio > 0.5 ? '#e2b86b' : hpRatio > 0.25 ? '#e68a4f' : '#e04848';
+    ctx.fillStyle = 'rgba(30, 36, 44, 0.9)';
+    ctx.fillRect(x, y, bw, bh);
+    ctx.fillStyle = barCol;
+    ctx.fillRect(x, y, bw * hpRatio, bh);
+
+    ctx.font = '11px Georgia, serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillStyle = '#d5dde6';
+    const flapReady = player.onGround || player.airFlapsLeft > 0;
+    ctx.fillText(`RESOLVE`, x, y + 13);
+
+    ctx.textAlign = 'right';
+    ctx.fillStyle = flapReady ? '#9be0ff' : '#657280';
+    ctx.fillText(flapReady ? '● FLAP READY' : '○ FLAP USED', x + bw, y + 13);
+    ctx.restore();
+  }
+
+  // 2. Paradise Exploration Tracker (Acts 2 & 5)
+  if ((a === 2 || a === 5) && !game.poemActive) {
+    const foundCount = world.wonders.filter((w) => w.found).length;
+    ctx.save();
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.font = '13px Georgia, serif';
+    ctx.fillStyle = 'rgba(255, 240, 210, 0.88)';
+    ctx.shadowColor = 'rgba(60, 30, 10, 0.55)';
+    ctx.shadowBlur = 8;
+    ctx.fillText(`✦ Sacred Wonders: ${foundCount} / ${world.wonders.length}`, 22, 18);
+    if (!world.comp.revealed) {
+      ctx.fillStyle = 'rgba(255, 222, 155, 0.78)';
+      ctx.font = 'italic 12px Georgia, serif';
+      ctx.fillText(`Ascend to the highest eastern bough... someone waits in the golden blossoms`, 22, 38);
+    } else if (world.comp.bondLevel > 0) {
+      ctx.fillStyle = '#ffe599';
+      ctx.font = '12px Georgia, serif';
+      ctx.fillText(`♥ Companion Bond: ${'♥'.repeat(Math.min(4, world.comp.bondLevel))}`, 22, 38);
+    }
+    ctx.restore();
+  }
+
+  // 3. Wind Shift Countdown in Act 2
+  if (a === 2 || (a === 3 && game.actT < 2.2)) {
+    const alpha = a === 2 ? smooth(game.actT / 1.2) : 1 - smooth((game.actT - 0.5) / 1.7);
+    const pulse = a === 2 && game.windShift <= 10 ? 1 + 0.07 * Math.max(0, 1 - (game.windShift % 1) * 3) : 1;
+    ctx.save();
+    ctx.globalAlpha = alpha; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.translate(vw / 2, 68); ctx.scale(pulse, pulse);
+    ctx.font = '600 30px Georgia, "Times New Roman", serif';
+    if ('letterSpacing' in ctx) ctx.letterSpacing = '5px';
+    ctx.shadowColor = 'rgba(80,40,10,.45)'; ctx.shadowBlur = 14;
+    ctx.fillStyle = mix('#fff3dc', '#c8d2de', game.cool);
+    ctx.fillText(`WIND SHIFT IN ${fmt(game.windShift)}`, 0, 0);
+    ctx.restore();
+  }
+
+  // 4. Narrative Banner Notification
+  if (game.bannerT > 0 && game.bannerText && !game.introActive && !(a === 3 && game.act3Stage === 'tether')) {
+    const aBanner = Math.min(1, game.bannerT * 1.5);
+    ctx.save();
+    ctx.globalAlpha = aBanner;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = 'italic 14px Georgia, serif';
+    ctx.shadowColor = 'rgba(0,0,0,0.85)';
+    ctx.shadowBlur = 10;
+    ctx.fillStyle = '#ffe9b8';
+    ctx.fillText(game.bannerText, vw / 2, VH - 36);
+    ctx.restore();
+  }
+
+  // 5. Cinematic Intro & Act 3 Heartbreak Fading Subtitles
+  if (game.emotionalAlpha > 0.01 && game.emotionalText) {
+    ctx.save();
+    ctx.globalAlpha = game.emotionalAlpha;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = 'italic 19px Georgia, "Times New Roman", serif';
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.95)';
+    ctx.shadowBlur = 16;
+    ctx.fillStyle = a === 3 ? '#fff0d4' : '#e8eef5';
+    ctx.fillText(game.emotionalText, vw / 2, VH * 0.22);
+    ctx.restore();
+  }
+}
+
+function render() {
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.fillStyle = '#07090b'; ctx.fillRect(0, 0, W, H);
+  const ar = game.ar;
+  const fw = Math.min(W, H * ar), fh = fw / ar;
+  const fx = Math.round((W - fw) / 2), fy = Math.round((H - fh) / 2), s = fh / VH;
+  const vw = fw / s, z = game.zoom;
+  ctx.save();
+  ctx.beginPath(); ctx.rect(fx, fy, fw, fh); ctx.clip();
+  ctx.translate(fx, fy); ctx.scale(s, s);
+
+  world.drawBack(ctx, G);
+  ctx.save();
+  ctx.translate(vw / 2, VH / 2); ctx.scale(z, z); ctx.translate(-vw / 2, -VH / 2);
+  ctx.translate(-game.cam.x, -game.cam.y);
+  world.drawScene(ctx, G);
+  player.draw(ctx, 1 - G.eg);
+  if (game.act === 3 && game.act3TearFeather) {
+    world.drawKeepsakeFeather(ctx, game.act3TearFeather);
+  }
+  world.drawFront(ctx, G);
+  ctx.restore();
+  world.drawOverlay(ctx, G);
+  drawHud(vw);
+  if (game.whiteFlash > 0) { ctx.fillStyle = `rgba(235,240,255,${0.6 * game.whiteFlash})`; ctx.fillRect(0, 0, vw, VH); }
+  if (game.fade > 0) { ctx.fillStyle = `rgba(7,9,11,${game.fade})`; ctx.fillRect(0, 0, vw, VH); }
+  ctx.restore();
+}
+
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min((now - last) / 1000, 0.05);
+  last = now;
+  if (game.started && titleEl.classList.contains('hidden')) {
+    readInput();
+    update(dt);
+  } else {
+    game.time += dt;
+    buildG();
+    updateCamera(dt);
+    world.update(dt, G, player);
+    player.animate(dt, 0, null, input);
+  }
+  render();
+  requestAnimationFrame(frame);
+}
+
+startAct(1);
+game.ar = 1.78; game.snap = true;
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
